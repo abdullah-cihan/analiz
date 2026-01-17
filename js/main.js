@@ -7,6 +7,117 @@ window.groupingCandidates = [];
 window.feedbackColumns = [];
 window.multiSelectCandidates = [];
 
+// --- SAMPLE DATA GENERATION ---
+function loadSampleData() {
+    loader.style.display = 'block';
+    statusMsg.classList.add('hidden');
+
+    // Simulate network delay for effect
+    setTimeout(() => {
+        try {
+            const sampleData = generateSampleData();
+            originalJson = sampleData;
+            analyzeAndProcess(sampleData);
+
+            loader.style.display = 'none';
+            uploadOverlay.style.opacity = '0';
+            setTimeout(() => {
+                uploadOverlay.style.display = 'none';
+                mainContainer.classList.remove('blur-sm');
+            }, 500);
+
+            // Show a toast or notification that sample data is loaded
+            alert("Örnek veri seti başarıyla yüklendi! Sistemin tüm özelliklerini keşfedebilirsiniz.");
+
+        } catch (err) {
+            loader.style.display = 'none';
+            statusMsg.textContent = "Örnek veri yüklenirken hata oluştu: " + err.message;
+            statusMsg.classList.remove('hidden');
+        }
+    }, 800);
+}
+
+function generateSampleData() {
+    const rowCount = 120; // Enough data for stats
+    const departments = ['İnsan Kaynakları', 'Bilgi İşlem', 'Satış & Pazarlama', 'Üretim', 'Finans'];
+    const titles = ['Uzman', 'Uzman Yardımcısı', 'Yönetici', 'Direktör', 'Stajyer'];
+    const locations = ['İstanbul', 'Ankara', 'İzmir', 'Bursa'];
+    const tools = ['Excel', 'PowerBI', 'Tableau', 'Jira', 'Slack', 'Teams', 'Zoom'];
+
+    const questions = [
+        "Şirket hedefleri ve stratejileri hakkında yeterince bilgilendiriliyorum.",
+        "Yöneticimden aldığım geri bildirimler gelişimime katkı sağlıyor.",
+        "Çalışma ortamım verimli çalışmam için uygundur.",
+        "Takım arkadaşlarım arasında iş birliği ve dayanışma yüksektir.",
+        "Şirket içi iletişim kanalları etkin bir şekilde kullanılıyor.",
+        "Yaptığım işin şirket başarısına katkısını görebiliyorum.",
+        "Kariyer gelişimim için yeterli fırsatlar sunuluyor.",
+        "Ücret ve yan haklar politikası adil ve tatmin edicidir.",
+        "İş-özel hayat dengesini kurabiliyorum.",
+        "Genel olarak bu şirkette çalışmaktan memnunum."
+    ];
+
+    const data = [];
+
+    for (let i = 0; i < rowCount; i++) {
+        const row = {};
+
+        // Demographics
+        row['Departman'] = departments[Math.floor(Math.random() * departments.length)];
+        row['Unvan'] = titles[Math.floor(Math.random() * titles.length)];
+        row['Lokasyon'] = locations[Math.floor(Math.random() * locations.length)];
+        row['Kıdem Yılı'] = Math.floor(Math.random() * 15) + 1; // 1-15 years
+
+        // Likert Questions (Weighted random for realism)
+        questions.forEach((q, idx) => {
+            // Skew towards positive results generally (3, 4, 5)
+            const r = Math.random();
+            let val;
+            if (r < 0.1) val = 1;
+            else if (r < 0.25) val = 2;
+            else if (r < 0.5) val = 3;
+            else if (r < 0.8) val = 4;
+            else val = 5;
+            row[`Soru ${idx + 1}: ${q}`] = val;
+        });
+
+        // Multi-select column
+        const numTools = Math.floor(Math.random() * 4) + 1;
+        const selectedTools = [];
+        for (let j = 0; j < numTools; j++) {
+            const tool = tools[Math.floor(Math.random() * tools.length)];
+            if (!selectedTools.includes(tool)) selectedTools.push(tool);
+        }
+        row['Kullandığınız Araçlar (Çoklu Seçim)'] = selectedTools.join('; ');
+
+        // Feedback (Random sentiments)
+        const sentiments = [
+            "Genel olarak çalışma ortamından memnunum ancak sosyal alanlar geliştirilebilir.",
+            "Yöneticim çok ilgili, teşekkürler.",
+            "Maaş artış oranları beklentimin altında kaldı.",
+            "Eğitim fırsatları daha fazla olmalı diye düşünüyorum.",
+            "Harika bir ekip ortamımız var, herkes çok yardımcı.",
+            "Yemekhane kalitesi artırılmalı.",
+            "Uzaktan çalışma imkanları çok değerli.",
+            "İletişim kopuklukları yaşanabiliyor bazen.",
+            "Şirketin vizyonuna inanıyorum.",
+            "Toplantı süreleri çok uzun, daha verimli olabilir."
+        ];
+
+        // Add feedback to 40% of rows
+        if (Math.random() < 0.4) {
+            row['Genel Görüş ve Önerileriniz'] = sentiments[Math.floor(Math.random() * sentiments.length)];
+        } else {
+            row['Genel Görüş ve Önerileriniz'] = "";
+        }
+
+        data.push(row);
+    }
+
+    return data;
+}
+
+
 // --- UPLOAD HANDLERS ---
 const dropZone = document.getElementById('dropZone');
 const uploadOverlay = document.getElementById('uploadOverlay');
