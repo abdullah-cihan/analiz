@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Etkileşimli Analiz Paneli</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        slate: { 850: '#1e293b' } // Custom dark shade
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- html2canvas for image export -->
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+
+    <!-- Chart.js Datalabels Plugin -->
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+
+    <!-- Chart.js Annotation Plugin -->
+    <script
+        src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-annotation/2.2.1/chartjs-plugin-annotation.min.js"></script>
+
+    <!-- SheetJS (Excel Parser) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <!-- html2pdf.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <!-- Driver.js (Onboarding) -->
+    <script src="https://cdn.jsdelivr.net/npm/driver.js@1.0.1/dist/driver.js.iife.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/driver.js@1.0.1/dist/driver.css" />
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body
+    class="text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900 flex h-screen overflow-hidden transition-colors duration-300">
+    <!-- UPLOAD OVERLAY -->
+    <div id="uploadOverlay" class="upload-overlay backdrop-blur-sm dark:bg-slate-900/80">
+        <div
+            class="bg-white dark:bg-slate-800 p-10 rounded-2xl shadow-xl max-w-xl w-full text-center border border-slate-200 dark:border-slate-700">
+            <div class="mb-6">
+                <div
+                    class="h-20 w-20 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-full flex items-center justify-center mx-auto text-3xl mb-4">
+                    <i class="fa-solid fa-file-excel"></i>
+                </div>
+                <h2 class="text-2xl font-bold text-slate-800 dark:text-white">Veri Dosyasını Yükleyin</h2>
+                <p class="text-slate-500 dark:text-slate-400 mt-2">Memnuniyet Anketi (.xlsx) dosyasını yükleyerek
+                    analize başlayın.</p>
+                <p class="text-xs text-slate-400 dark:text-slate-500 mt-1">(Otomatik Sütun Algılama Özelliği Aktif)</p>
+            </div>
+
+            <div id="dropZone"
+                class="border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl p-8 transition cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:border-slate-400 dark:hover:border-slate-500 bg-slate-50 dark:bg-slate-800/50"
+                onclick="document.getElementById('fileInput').click()">
+                <i class="fa-solid fa-cloud-arrow-up text-4xl text-slate-300 dark:text-slate-500 mb-3"></i>
+                <p class="font-medium text-slate-600 dark:text-slate-300">Dosyayı buraya sürükleyin</p>
+                <p class="text-xs text-slate-400 dark:text-slate-500 mt-1">veya seçmek için tıklayın</p>
+                <input type="file" id="fileInput" class="hidden" accept=".xlsx, .xls" onchange="handleFileSelect(this)">
+            </div>
+
+            <div id="loader" class="loader"></div>
+            <p id="statusMsg" class="text-sm text-red-500 mt-4 hidden"></p>
+        </div>
+    </div>
+
+    <!-- DETAIL MODAL -->
+    <div id="detailModal"
+        class="fixed inset-0 z-[100] hidden modal-bg flex items-center justify-center p-4 backdrop-blur-sm no-print">
+        <div
+            class="bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-w-2xl w-full flex flex-col max-h-[90vh] overflow-hidden">
+            <div class="p-5 border-b border-slate-100 dark:border-slate-700 flex justify-between items-start">
+                <div>
+                    <h3 class="text-lg font-bold text-slate-800 dark:text-white" id="modal-title">Detay Analizi</h3>
+                    <p class="text-sm text-slate-500 dark:text-slate-400 mt-1" id="modal-subtitle">Grup ve Soru detayı
+                    </p>
+                </div>
+                <button onclick="closeModal()"
+                    class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+            <div class="p-6 overflow-y-auto">
+                <div class="flex gap-4 mb-6">
+                    <div class="flex-1 bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg text-center">
+                        <div class="text-xs text-blue-600 dark:text-blue-400 font-bold uppercase">Ortalama</div>
+                        <div class="text-2xl font-bold text-blue-900 dark:text-blue-100" id="modal-avg">-</div>
+                    </div>
+                    <div class="flex-1 bg-slate-50 dark:bg-slate-700/30 p-4 rounded-lg text-center">
+                        <div class="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase">Katılımcı (N)</div>
+                        <div class="text-2xl font-bold text-slate-700 dark:text-slate-200" id="modal-count">-</div>
+                    </div>
+                    <div class="flex-1 bg-emerald-50 dark:bg-emerald-900/20 p-4 rounded-lg text-center">
+                        <div class="text-xs text-emerald-600 dark:text-emerald-400 font-bold uppercase">Memnuniyet Oranı
+                        </div>
+                        <div class="text-2xl font-bold text-emerald-900 dark:text-emerald-100" id="modal-perc">-%</div>
+                    </div>
+                </div>
+                <div>
+                    <h4 class="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">Cevap Dağılımı (1-5 Puan)</h4>
+                    <div class="h-48">
+                        <canvas id="modalChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- COMPARISON MODAL (NEW) -->
+    <div id="compareModal"
+        class="fixed inset-0 z-[100] hidden modal-bg flex items-center justify-center p-4 backdrop-blur-sm no-print">
+        <div
+            class="bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-w-4xl w-full flex flex-col max-h-[90vh] overflow-hidden">
+            <div
+                class="p-5 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-indigo-50 dark:bg-indigo-900/40">
+                <div>
+                    <h3 class="text-lg font-bold text-indigo-900 dark:text-indigo-100"><i
+                            class="fa-solid fa-scale-balanced mr-2"></i>Birebir
+                        Karşılaştırma</h3>
+                    <p class="text-xs text-indigo-600 dark:text-indigo-300">İki farklı grubu detaylı analiz edin</p>
+                </div>
+                <button onclick="document.getElementById('compareModal').classList.add('hidden')"
+                    class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+
+            <div class="p-6 overflow-y-auto flex flex-col gap-6">
+                <!-- Selectors -->
+                <div
+                    class="flex flex-col sm:flex-row gap-4 items-end bg-slate-50 dark:bg-slate-700/30 p-4 rounded-lg border border-slate-200 dark:border-slate-600">
+                    <div class="flex-1 w-full">
+                        <label class="block text-xs font-bold text-indigo-500 dark:text-indigo-400 mb-1">Grup A</label>
+                        <select id="compA"
+                            class="w-full p-2 border border-indigo-200 dark:border-slate-500 rounded bg-white dark:bg-slate-600 dark:text-white text-sm"></select>
+                    </div>
+                    <div class="text-slate-400 font-bold px-2">VS</div>
+                    <div class="flex-1 w-full">
+                        <label class="block text-xs font-bold text-orange-500 dark:text-orange-400 mb-1">Grup B</label>
+                        <select id="compB"
+                            class="w-full p-2 border border-orange-200 dark:border-slate-500 rounded bg-white dark:bg-slate-600 dark:text-white text-sm"></select>
+                    </div>
+                    <button onclick="renderComparison()"
+                        class="px-6 py-2 bg-slate-800 dark:bg-slate-600 text-white rounded text-sm font-bold hover:bg-slate-900 dark:hover:bg-slate-500 transition">
+                        Analiz Et
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Chart -->
+                    <div class="h-[350px] relative border border-slate-100 dark:border-slate-700 rounded-lg p-2">
+                        <canvas id="compChart"></canvas>
+                    </div>
+                    <!-- Differences Table -->
+                    <div class="flex flex-col h-[350px]">
+                        <h4 class="text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">En Büyük Farklar (Delta)
+                        </h4>
+                        <div class="flex-1 overflow-y-auto border border-slate-100 dark:border-slate-700 rounded-lg">
+                            <table class="w-full text-xs text-left">
+                                <thead class="bg-slate-50 dark:bg-slate-700 sticky top-0">
+                                    <tr>
+                                        <th class="p-2 border-b dark:border-slate-600 dark:text-slate-200">Konu</th>
+                                        <th class="p-2 border-b dark:border-slate-600 dark:text-slate-200 text-center">
+                                            Fark</th>
+                                        <th class="p-2 border-b dark:border-slate-600 dark:text-slate-200">Üstün Taraf
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody id="compTableBody" class="divide-y divide-slate-50 dark:divide-slate-700">
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar / Filters -->
+    <aside
+        class="sidebar w-80 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col h-full shrink-0 overflow-y-auto z-20 print:hidden no-print">
+        <div class="p-6 border-b border-slate-100 dark:border-slate-800">
+            <!-- YouTube Link Integration -->
+            <a href="https://www.youtube.com/@teknolojikcozumvideo" target="_blank"
+                class="flex items-center gap-3 text-blue-800 dark:text-blue-400 mb-1 hover:text-red-600 transition-colors group"
+                title="YouTube Kanalına Git">
+                <i class="fa-brands fa-youtube text-2xl group-hover:scale-110 transition-transform"></i>
+                <h1 class="text-xl font-bold tracking-tight text-slate-800 dark:text-slate-100">Teknolojik Çözüm
+                    Videoları</h1>
+            </a>
+            <p class="text-xs text-slate-500 dark:text-slate-400 font-medium ml-9">Gelişmiş Analiz Paneli</p>
+        </div>
+
+        <div class="p-6 space-y-8 flex-1 overflow-y-auto">
+
+            <!-- Dynamic Grouping Selection -->
+            <div>
+                <div class="flex justify-between items-center mb-3">
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider">
+                        <i class="fa-solid fa-layer-group mr-1"></i> Karşılaştırma
+                    </label>
+                    <button onclick="resetFilters()"
+                        class="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 font-medium transition hover:underline flex items-center gap-1"
+                        title="Tüm filtreleri ve seçimleri sıfırla">
+                        <i class="fa-solid fa-rotate-left"></i> Sıfırla
+                    </button>
+                </div>
+                <select id="groupSelect" onchange="updateDashboard()"
+                    class="w-full bg-blue-50 dark:bg-slate-800 border border-blue-200 dark:border-slate-600 text-blue-900 dark:text-blue-100 font-medium text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 shadow-sm">
+                    <option value="none">Karşılaştırma Yok (Genel)</option>
+                    <!-- Dinamik olarak dolacak -->
+                </select>
+
+                <!-- NEW COMPARISON BUTTON -->
+                <button onclick="openComparisonModal()" id="btn-open-comp"
+                    class="mt-2 w-full py-1.5 text-xs font-bold text-indigo-600 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800 rounded hover:bg-indigo-100 transition hidden">
+                    <i class="fa-solid fa-code-compare mr-1"></i> İki Grubu Kıyasla
+                </button>
+
+                <p class="text-[10px] text-slate-400 mt-1.5">
+                    Grafikte veya Isı Haritasında sütunları neye göre böleceğinizi seçin.
+                </p>
+            </div>
+
+            <!-- Dynamic Filters -->
+            <div>
+                <div class="flex justify-between items-center mb-3">
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider">
+                        <i class="fa-solid fa-filter mr-1"></i> Veri Filtrele
+                    </label>
+                </div>
+
+                <div id="dynamicFilters" class="space-y-2 mb-3">
+                    <!-- Dinamik filtre satırları buraya gelecek -->
+                    <p class="text-xs text-slate-400 italic" id="no-filter-msg">Henüz filtre eklenmedi.</p>
+                </div>
+
+                <button onclick="addNewFilter()"
+                    class="w-full py-2 text-xs font-medium text-blue-600 dark:text-blue-400 border border-dashed border-blue-300 dark:border-slate-600 rounded-lg hover:bg-blue-50 dark:hover:bg-slate-800 transition flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-plus"></i> Filtre Ekle
+                </button>
+            </div>
+
+            <!-- Stats Summary in Sidebar -->
+            <div
+                class="bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700 shadow-sm space-y-2">
+                <h4
+                    class="text-slate-800 dark:text-slate-200 font-semibold text-sm mb-3 pb-2 border-b border-slate-100 dark:border-slate-700">
+                    Anlık Özet</h4>
+                <div class="flex justify-between items-center text-sm">
+                    <span class="text-slate-500 dark:text-slate-400">Katılımcı:</span>
+                    <span
+                        class="font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded"
+                        id="visible-count">0</span>
+                </div>
+                <div class="flex justify-between items-center text-sm">
+                    <span class="text-slate-500 dark:text-slate-400">Ort. Puan:</span>
+                    <span
+                        class="font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-2 py-0.5 rounded"
+                        id="visible-avg">0.0</span>
+                </div>
+                <div class="flex justify-between items-center text-sm">
+                    <span class="text-slate-500 dark:text-slate-400">Genel Std. Sapma:</span>
+                    <span
+                        class="font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-0.5 rounded"
+                        id="visible-std">0.0</span>
+                </div>
+                <div class="flex justify-between items-center text-sm">
+                    <span class="text-slate-500 dark:text-slate-400"
+                        title="İç Tutarlılık (Cronbach's Alpha)">Güvenilirlik (Alpha):</span>
+                    <span
+                        class="font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30 px-2 py-0.5 rounded"
+                        id="visible-alpha">0.00</span>
+                </div>
+            </div>
+
+            <!-- Reset Button -->
+            <button onclick="location.reload()"
+                class="w-full py-2.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-white hover:bg-red-500 transition border border-slate-200 dark:border-slate-700 hover:border-red-500 rounded-lg flex items-center justify-center gap-2">
+                <i class="fa-solid fa-power-off"></i> Veriyi Sıfırla / Yeni Dosya
+            </button>
+
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main
+        class="flex-1 flex flex-col h-full overflow-hidden bg-slate-50/50 dark:bg-slate-900/50 filter blur-sm transition-all duration-500 relative"
+        id="mainContainer">
+
+        <!-- Tab Navigation Header -->
+        <header
+            class="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex flex-col shrink-0 px-8 pt-6 no-print">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-xl font-bold text-slate-800 dark:text-white" id="page-title">Analiz Paneli</h2>
+                <div class="flex items-center gap-3">
+                    <button onclick="startTour()"
+                        class="px-3 py-1.5 text-xs font-medium bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 rounded-lg transition flex items-center gap-2"
+                        title="Nasıl Kullanılır?">
+                        <i class="fa-solid fa-circle-question"></i> <span class="hidden sm:inline">Rehber</span>
+                    </button>
+                    <button onclick="exportPDFNative()"
+                        class="px-3 py-1.5 text-xs font-medium bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/50 rounded-lg transition flex items-center gap-2"
+                        title="PDF Rapor İndir">
+                        <i class="fa-solid fa-file-pdf"></i> <span class="hidden sm:inline">Rapor</span>
+                    </button>
+                    <button onclick="toggleDarkMode()"
+                        class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-yellow-400 transition bg-slate-50 dark:bg-slate-700 rounded-full"
+                        title="Karanlık Mod">
+                        <i class="fa-solid fa-moon dark:hidden"></i>
+                        <i class="fa-solid fa-sun hidden dark:block text-yellow-400"></i>
+                    </button>
+                    <div class="text-right hidden sm:block">
+                        <p class="text-sm font-medium text-slate-900 dark:text-white">Anket Sonuçları</p>
+                        <p class="text-xs text-slate-500" id="last-update">Veri Yüklenmedi</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div class="flex space-x-1 overflow-x-auto">
+                <button onclick="switchTab('general')" id="tab-btn-general"
+                    class="tab-btn active px-4 py-2 text-sm font-medium rounded-t-lg flex items-center gap-2 whitespace-nowrap">
+                    <i class="fa-solid fa-chart-pie"></i> Genel Bakış
+                </button>
+                <button onclick="switchTab('heatmap')" id="tab-btn-heatmap"
+                    class="tab-btn px-4 py-2 text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-t-lg flex items-center gap-2 whitespace-nowrap">
+                    <i class="fa-solid fa-table-cells"></i> Gelişmiş Isı Haritası
+                </button>
+                <button onclick="switchTab('feedback')" id="tab-btn-feedback"
+                    class="tab-btn px-4 py-2 text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-t-lg flex items-center gap-2 whitespace-nowrap">
+                    <i class="fa-solid fa-comments"></i> Görüş ve Öneriler
+                </button>
+                <button onclick="switchTab('report')" id="tab-btn-report"
+                    class="tab-btn px-4 py-2 text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-t-lg flex items-center gap-2 whitespace-nowrap">
+                    <i class="fa-solid fa-file-lines"></i> Detaylı Rapor
+                </button>
+                <button onclick="switchTab('editor')" id="tab-btn-editor"
+                    class="tab-btn px-4 py-2 text-sm font-medium text-slate-500 hover:text-slate-700 rounded-t-lg flex items-center gap-2 whitespace-nowrap">
+                    <i class="fa-solid fa-pen-to-square"></i> Veri Yönetimi
+            </div>
+        </header>
+
+        <!-- Scrollable Content -->
+        <div class="flex-1 overflow-y-auto p-8 bg-slate-50 dark:bg-slate-900 transition-colors" id="content-area">
+            <div class="max-w-8xl mx-auto space-y-8">
+
+                <!-- TAB 1: GENERAL OVERVIEW -->
+                <div id="tab-general" class="space-y-6 tab-content">
+
+                    <!-- Chart Type Selector -->
+                    <div class="flex flex-col sm:flex-row justify-between items-center mb-2 no-print gap-4">
+                        <!-- Benchmark Input -->
+                        <div
+                            class="flex items-center gap-2 bg-white dark:bg-slate-800 p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm">
+                            <label class="text-xs font-bold text-slate-500 dark:text-slate-400 pl-1">Hedef Puan
+                                (Benchmark):</label>
+                            <input type="number" id="targetScore" min="1" max="5" step="0.1" value="4.0"
+                                onchange="updateDashboard()"
+                                class="w-16 p-1 text-xs border border-slate-300 dark:border-slate-600 rounded text-center focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-700 text-slate-900 dark:text-white">
+                        </div>
+
+                        <div
+                            class="bg-white dark:bg-slate-800 p-1 rounded-lg border border-slate-200 dark:border-slate-700 inline-flex shadow-sm gap-1 flex-wrap">
+                            <button onclick="setChartType('bar')"
+                                class="px-3 py-1.5 rounded text-xs font-medium transition bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-200 shadow-sm"
+                                id="btn-bar" title="Dikey Bar">
+                                <i class="fa-solid fa-chart-column mr-1"></i> Dikey
+                            </button>
+                            <button onclick="setChartType('horizontalBar')"
+                                class="px-3 py-1.5 rounded text-xs font-medium transition text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+                                id="btn-horizontalBar" title="Yatay Bar">
+                                <i class="fa-solid fa-bars mr-1"></i> Yatay
+                            </button>
+                            <button onclick="setChartType('line')"
+                                class="px-3 py-1.5 rounded text-xs font-medium transition text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+                                id="btn-line" title="Çizgi Grafik">
+                                <i class="fa-solid fa-chart-line mr-1"></i> Çizgi
+                            </button>
+                            <button onclick="setChartType('area')"
+                                class="px-3 py-1.5 rounded text-xs font-medium transition text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+                                id="btn-area" title="Alan Grafiği">
+                                <i class="fa-solid fa-chart-area mr-1"></i> Alan
+                            </button>
+                            <button onclick="setChartType('scatter')"
+                                class="px-3 py-1.5 rounded text-xs font-medium transition text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+                                id="btn-scatter" title="Nokta Grafiği">
+                                <i class="fa-solid fa-braille mr-1"></i> Nokta
+                            </button>
+                            <button onclick="setChartType('radar')"
+                                class="px-3 py-1.5 rounded text-xs font-medium transition text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+                                id="btn-radar" title="Radar Grafik">
+                                <i class="fa-solid fa-bullseye mr-1"></i> Radar
+                            </button>
+                            <button onclick="setChartType('polarArea')"
+                                class="px-3 py-1.5 rounded text-xs font-medium transition text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+                                id="btn-polarArea" title="Kutupsal Alan">
+                                <i class="fa-solid fa-chart-pie mr-1"></i> Kutupsal
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Main Chart Section -->
+                    <div class="card p-6">
+                        <div class="flex justify-between items-start mb-6">
+                            <div>
+                                <h3 class="text-lg font-bold text-slate-800 dark:text-white">Memnuniyet Karşılaştırması
+                                </h3>
+                                <p class="text-sm text-slate-500 dark:text-slate-400" id="chart-subtitle">Tüm soruların
+                                    genel ortalaması</p>
+                            </div>
+                            <!-- Header Actions -->
+                            <div class="flex items-center gap-4 no-print">
+                                <div class="flex items-center gap-2 text-xs">
+                                    <span class="inline-block w-3 h-3 rounded-full bg-red-400"></span> 1-2
+                                    <span class="inline-block w-3 h-3 rounded-full bg-yellow-400 ml-2"></span> 3
+                                    <span class="inline-block w-3 h-3 rounded-full bg-emerald-400 ml-2"></span> 4-5
+                                    <span
+                                        class="inline-block w-6 h-1 bg-red-500 ml-2 border-b-2 border-dashed border-red-500"></span>
+                                    Hedef
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <button onclick="copyChartToClipboard('mainChart', 'copy-msg-main')"
+                                        id="btn-copy-main"
+                                        class="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 rounded text-xs font-medium transition"
+                                        title="Grafiği Kopyala">
+                                        <i class="fa-regular fa-copy"></i> <span class="hidden sm:inline">Kopyala</span>
+                                    </button>
+                                    <span id="copy-msg-main"
+                                        class="text-xs text-green-600 font-medium hidden">Kopyalandı!</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="chart-container" id="mainChartContainer">
+                            <canvas id="mainChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Grid Layout for Distribution & Multi-Select -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+                        <!-- Distribution Chart -->
+                        <div class="card p-6 flex flex-col">
+                            <div class="flex justify-between items-center mb-4">
+                                <div>
+                                    <h4 class="font-bold text-slate-700 dark:text-white text-lg">Katılımcı Dağılımı</h4>
+                                    <p class="text-xs text-slate-400 dark:text-slate-400">Katılımcıların gruplara göre
+                                        oransal dağılımı</p>
+                                </div>
+                                <div class="flex items-center gap-2 no-print">
+                                    <button onclick="copyChartToClipboard('distChart', 'copy-msg-dist')"
+                                        id="btn-copy-dist"
+                                        class="text-slate-400 hover:text-blue-600 transition p-2 hover:bg-slate-100 rounded-full"
+                                        title="Grafiği Kopyala">
+                                        <i class="fa-regular fa-copy text-lg"></i>
+                                    </button>
+                                    <span id="copy-msg-dist"
+                                        class="text-xs text-green-600 font-medium hidden">Kopyalandı!</span>
+                                </div>
+                            </div>
+                            <div class="flex-1 flex items-center justify-center relative min-h-[300px]">
+                                <canvas id="distChart"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- NEW: Multi-Select Analysis Card (Side-by-Side) -->
+                        <div id="multi-select-container" class="card p-6 flex flex-col hidden">
+                            <div class="flex flex-col sm:flex-row justify-between items-start mb-4 gap-4">
+                                <div>
+                                    <h3 class="text-lg font-bold text-slate-800 dark:text-white">Çoklu Seçim Analizi
+                                    </h3>
+                                    <p class="text-xs text-slate-500 dark:text-slate-400">Checkbox soruları</p>
+                                </div>
+                                <div class="flex items-center gap-2 w-full sm:w-auto">
+                                    <select id="multiSelectCol" onchange="renderMultiSelectAnalysis()"
+                                        class="bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-white text-xs rounded-lg focus:ring-blue-500 focus:border-blue-500 p-1.5 flex-1 sm:w-32">
+                                        <!-- Populated by JS -->
+                                    </select>
+                                    <button onclick="copyChartToClipboard('multiSelectChart', 'copy-msg-multi')"
+                                        class="text-slate-400 hover:text-blue-600 transition p-2 hover:bg-slate-100 rounded-full"
+                                        title="Grafiği Kopyala">
+                                        <i class="fa-regular fa-copy text-lg"></i>
+                                    </button>
+                                    <span id="copy-msg-multi"
+                                        class="text-xs text-green-600 font-medium hidden">Kopyalandı!</span>
+                                </div>
+                            </div>
+                            <div class="chart-container flex-1" style="min-height: 300px;">
+                                <canvas id="multiSelectChart"></canvas>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- Top/Bottom Questions & Correlation -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+                        <!-- High/Low -->
+                        <div class="card p-6 flex flex-col h-full justify-center">
+                            <h4 class="font-bold text-slate-800 dark:text-white mb-4">En Yüksek & En Düşük Puanlı
+                                Sorular</h4>
+                            <div class="flex-1 space-y-4 flex flex-col justify-center" id="high-low-container">
+                                <p class="text-sm text-slate-400 dark:text-slate-400">Veri bekleniyor...</p>
+                            </div>
+                        </div>
+                        <!-- Correlations -->
+                        <div class="card p-6 flex flex-col h-full">
+                            <h4 class="font-bold text-slate-800 dark:text-white mb-2 flex items-center gap-2">
+                                <i class="fa-solid fa-link text-slate-400 text-xs"></i> Güçlü İlişkiler (Korelasyon)
+                            </h4>
+                            <p class="text-[10px] text-slate-400 dark:text-slate-400 mb-3">Hangi sorulara verilen
+                                cevaplar birbirine en
+                                çok benziyor?</p>
+                            <div class="flex-1 space-y-2 overflow-y-auto max-h-[250px]" id="correlation-container">
+                                <p class="text-xs text-slate-400 dark:text-slate-400">Analiz bekleniyor...</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Detailed Table -->
+                    <div class="card overflow-hidden mt-6">
+                        <div
+                            class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                            <h3 class="font-bold text-slate-700">Soru Detayları</h3>
+                            <button onclick="exportTableToExcel()"
+                                class="px-3 py-1.5 bg-green-50 text-green-600 hover:bg-green-100 rounded text-xs font-bold transition flex items-center gap-2 border border-green-100 shadow-sm">
+                                <i class="fa-solid fa-file-excel"></i> Tabloyu İndir (Excel)
+                            </button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm text-left" id="detail-stats-table">
+                                <thead class="bg-slate-50 text-slate-500 font-medium">
+                                    <tr>
+                                        <th class="px-6 py-3 sortable" onclick="sortTable('id')"># <i
+                                                class="fa-solid fa-sort text-slate-300 ml-1"></i></th>
+                                        <th class="px-6 py-3 w-1/2">Soru Metni</th>
+                                        <th class="px-6 py-3 text-right sortable" onclick="sortTable('avg')">Ortalama <i
+                                                class="fa-solid fa-sort text-slate-300 ml-1"></i></th>
+                                        <th class="px-6 py-3 text-right sortable" onclick="sortTable('std')">Std. Sapma
+                                            <i class="fa-solid fa-sort text-slate-300 ml-1"></i>
+                                        </th>
+                                        <th class="px-6 py-3 text-center">Durum</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100" id="questions-table">
+                                    <!-- JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 2: HEATMAP -->
+                <div id="tab-heatmap" class="space-y-6 tab-content hidden">
+                    <div class="card p-6 h-full flex flex-col">
+                        <div id="sticky-heatmap-header"
+                            class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 shrink-0 sticky top-0 z-50 bg-white dark:bg-slate-800 pb-4 border-b border-slate-100 dark:border-slate-700">
+                            <div>
+                                <h3 class="text-lg font-bold text-slate-800 dark:text-white">Gelişmiş Isı Haritası
+                                    (Heatmap)</h3>
+                                <p class="text-sm text-slate-500 dark:text-slate-400">Hücrelere tıklayarak o grubun
+                                    detaylı cevap dağılımını
+                                    görebilirsiniz.</p>
+                            </div>
+                            <!-- Legend -->
+                            <div class="flex flex-wrap items-center gap-2 text-xs font-medium">
+                                <div class="px-2 py-1 rounded bg-red-100 text-red-800 border border-red-200">1.0 - 2.5
+                                    (Zayıf)</div>
+                                <div class="px-2 py-1 rounded bg-orange-100 text-orange-800 border border-orange-200">
+                                    2.5 - 3.5 (Orta)</div>
+                                <div class="px-2 py-1 rounded bg-yellow-100 text-yellow-800 border border-yellow-200">
+                                    3.5 - 4.2 (İyi)</div>
+                                <div
+                                    class="px-2 py-1 rounded bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                    4.2 - 5.0 (Çok İyi)</div>
+                            </div>
+
+                            <!-- NEW: Heatmap Controls -->
+                            <div class="flex items-center gap-2 ml-auto flex-wrap">
+                                <!-- Theme Selector -->
+                                <select id="heatmapTheme" onchange="applyHeatmapTheme(this.value)"
+                                    class="text-xs bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded px-2 py-1 cursor-pointer hover:border-blue-400 transition">
+                                    <option value="classic">🎨 Klasik</option>
+                                    <option value="blue">🌊 Mavi</option>
+                                    <option value="warm">🔥 Sıcak</option>
+                                    <option value="cool">❄️ Soğuk</option>
+                                    <option value="contrast">⚡ Kontrast</option>
+                                </select>
+
+                                <!-- Export Buttons -->
+                                <button onclick="exportHeatmapToExcel()"
+                                    class="px-2 py-1 text-xs bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 hover:bg-green-100 rounded transition flex items-center gap-1"
+                                    title="Excel'e Aktar">
+                                    <i class="fa-solid fa-file-excel"></i> Excel
+                                </button>
+
+                                <button onclick="exportHeatmapAsPNG()"
+                                    class="px-2 py-1 text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-100 rounded transition flex items-center gap-1"
+                                    title="PNG Olarak Kaydet">
+                                    <i class="fa-solid fa-camera"></i> PNG
+                                </button>
+
+                                <!-- Zoom Controls -->
+                                <div class="flex items-center gap-1 bg-slate-100 dark:bg-slate-700 rounded px-1">
+                                    <button onclick="zoomHeatmap(-0.25)"
+                                        class="w-6 h-6 text-xs hover:bg-slate-200 dark:hover:bg-slate-600 rounded transition flex items-center justify-center"
+                                        title="Uzaklaştır">
+                                        <i class="fa-solid fa-minus"></i>
+                                    </button>
+                                    <span id="heatmapZoomLevel"
+                                        class="text-xs font-medium px-1 min-w-[3rem] text-center">100%</span>
+                                    <button onclick="zoomHeatmap(0.25)"
+                                        class="w-6 h-6 text-xs hover:bg-slate-200 dark:hover:bg-slate-600 rounded transition flex items-center justify-center"
+                                        title="Yakınlaştır">
+                                        <i class="fa-solid fa-plus"></i>
+                                    </button>
+                                    <button onclick="resetHeatmapZoom()"
+                                        class="w-6 h-6 text-xs hover:bg-slate-200 dark:hover:bg-slate-600 rounded transition flex items-center justify-center ml-1"
+                                        title="Sıfırla">
+                                        <i class="fa-solid fa-arrow-rotate-left"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div
+                            class="overflow-auto max-h-[700px] border rounded-lg border-slate-200 shadow-inner bg-slate-50">
+                            <div id="heatmap-container" class="min-w-full relative">
+                                <!-- Heatmap Table Generated Here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 3: FEEDBACK & WORD CLOUD (IMPROVED) -->
+                <div id="tab-feedback" class="space-y-6 tab-content hidden">
+                    <div class="card p-6 min-h-[600px] flex flex-col">
+
+                        <!-- Header & Controls -->
+                        <div
+                            class="flex flex-col lg:flex-row justify-between items-start mb-6 gap-4 border-b border-slate-100 pb-6 no-print">
+                            <div>
+                                <h3 class="text-lg font-bold text-slate-800 dark:text-white">Görüş ve Öneriler Analizi
+                                </h3>
+                                <p class="text-sm text-slate-500">N-Gram (Kelime Öbeği) ve Veri Destekli Duygu Analizi
+                                    içerir.</p>
+                            </div>
+
+                            <div class="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
+                                <div class="flex-1">
+                                    <label
+                                        class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">İncelenecek
+                                        Sütun</label>
+                                    <select id="feedbackSource" onchange="renderFeedback()"
+                                        class="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full md:w-64 p-2">
+                                        <!-- Populated JS -->
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1">
+
+                            <!-- Left: Analytics & Cloud -->
+                            <div class="lg:col-span-1 flex flex-col gap-6">
+                                <!-- Sentiment Summary -->
+                                <div class="bg-slate-50 rounded-xl p-4 border border-slate-200">
+                                    <h4 class="text-xs font-bold text-slate-500 uppercase mb-3">Duygu Eğilimi (Hibrit
+                                        Analiz)</h4>
+                                    <div class="space-y-3">
+                                        <div>
+                                            <div class="flex justify-between text-xs mb-1">
+                                                <span class="text-emerald-600 font-bold">Olumlu</span>
+                                                <span id="sent-pos-val" class="text-slate-600">0</span>
+                                            </div>
+                                            <div class="w-full bg-slate-200 rounded-full h-2">
+                                                <div id="sent-pos-bar" class="bg-emerald-500 h-2 rounded-full"
+                                                    style="width: 0%"></div>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div class="flex justify-between text-xs mb-1">
+                                                <span class="text-red-600 font-bold">Olumsuz</span>
+                                                <span id="sent-neg-val" class="text-slate-600">0</span>
+                                            </div>
+                                            <div class="w-full bg-slate-200 rounded-full h-2">
+                                                <div id="sent-neg-bar" class="bg-red-500 h-2 rounded-full"
+                                                    style="width: 0%"></div>
+                                            </div>
+                                        </div>
+                                        <div class="text-[10px] text-slate-400 italic text-center pt-1">*Kelime +
+                                            Katılımcı Puanı Bazlı</div>
+                                    </div>
+                                </div>
+
+                                <!-- Word Cloud Area -->
+                                <div class="flex-1 bg-white border border-slate-200 rounded-xl p-4 flex flex-col">
+                                    <h4 class="text-xs font-bold text-slate-500 uppercase mb-3">Sık Kullanılan İfadeler
+                                        (Kelime & Öbekler)</h4>
+                                    <div id="cloud-container"
+                                        class="flex-1 flex flex-wrap content-start gap-1.5 overflow-y-auto max-h-[400px]">
+                                        <div class="w-full text-center text-slate-400 mt-10">Veri yok.</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Right: Search & List -->
+                            <div
+                                class="lg:col-span-2 flex flex-col bg-white border border-slate-200 rounded-xl overflow-hidden h-[600px]">
+                                <div
+                                    class="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center gap-4">
+                                    <h4 class="font-bold text-slate-700 flex items-center gap-2">
+                                        <i class="fa-solid fa-comments"></i> Yorum Listesi
+                                        <span id="comment-count"
+                                            class="text-xs bg-white px-2 py-0.5 rounded border border-slate-200 font-normal">0</span>
+                                    </h4>
+                                    <div class="relative w-1/2 no-print">
+                                        <div
+                                            class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                                            <i class="fa-solid fa-search text-slate-400 text-xs"></i>
+                                        </div>
+                                        <input type="text" id="commentSearch" onkeyup="filterComments()"
+                                            class="block w-full p-2 pl-8 text-xs text-slate-900 dark:text-white border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 focus:ring-blue-500 focus:border-blue-500"
+                                            placeholder="Yorumlarda ara...">
+                                    </div>
+                                </div>
+
+                                <div id="comments-list" class="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/30">
+                                    <!-- Comments populated here -->
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 4: DETAILED REPORT -->
+                <div id="tab-report" class="space-y-6 tab-content hidden">
+
+                    <!-- Executive Summary Card -->
+                    <div class="card p-6">
+                        <div class="flex items-center gap-3 mb-4">
+                            <div
+                                class="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center">
+                                <i class="fa-solid fa-chart-line text-blue-600 dark:text-blue-400 text-xl"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-bold text-slate-800 dark:text-white">Yönetici Özeti</h3>
+                                <p class="text-xs text-slate-500 dark:text-slate-400">Genel değerlendirme ve önemli
+                                    metrikler</p>
+                            </div>
+                        </div>
+                        <div id="executive-summary"
+                            class="prose dark:prose-invert max-w-none text-sm text-slate-600 dark:text-slate-300">
+                            <p class="text-slate-400 italic">Veri yüklendiğinde otomatik olarak oluşturulacak...</p>
+                        </div>
+                    </div>
+
+                    <!-- Key Metrics Grid -->
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div class="card p-4">
+                            <div class="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase mb-2">Genel
+                                Memnuniyet</div>
+                            <div class="text-2xl font-bold text-blue-600 dark:text-blue-400" id="report-overall-score">-
+                            </div>
+                            <div class="text-xs text-slate-400 mt-1" id="report-overall-desc">5 üzerinden</div>
+                        </div>
+                        <div class="card p-4">
+                            <div class="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase mb-2">Katılımcı
+                                Sayısı</div>
+                            <div class="text-2xl font-bold text-emerald-600 dark:text-emerald-400"
+                                id="report-participants">-</div>
+                            <div class="text-xs text-slate-400 mt-1">Toplam yanıt</div>
+                        </div>
+                        <div class="card p-4">
+                            <div class="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase mb-2">
+                                Güvenilirlik</div>
+                            <div class="text-2xl font-bold text-purple-600 dark:text-purple-400"
+                                id="report-reliability">-</div>
+                            <div class="text-xs text-slate-400 mt-1">Cronbach's Alpha</div>
+                        </div>
+                        <div class="card p-4">
+                            <div class="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase mb-2">Tutarlılık
+                            </div>
+                            <div class="text-2xl font-bold text-orange-600 dark:text-orange-400"
+                                id="report-consistency">-</div>
+                            <div class="text-xs text-slate-400 mt-1">Std. Sapma</div>
+                        </div>
+                    </div>
+
+                    <!-- Key Findings & Action Items -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+                        <!-- Key Findings -->
+                        <div class="card p-6">
+                            <div class="flex items-center gap-2 mb-4">
+                                <i class="fa-solid fa-lightbulb text-yellow-500 text-lg"></i>
+                                <h4 class="font-bold text-slate-800 dark:text-white">Önemli Bulgular</h4>
+                            </div>
+                            <div id="key-findings" class="space-y-3">
+                                <p class="text-sm text-slate-400 italic">Analiz bekleniyor...</p>
+                            </div>
+                        </div>
+
+                        <!-- Action Recommendations -->
+                        <div class="card p-6">
+                            <div class="flex items-center gap-2 mb-4">
+                                <i class="fa-solid fa-clipboard-check text-green-500 text-lg"></i>
+                                <h4 class="font-bold text-slate-800 dark:text-white">Aksiyon Önerileri</h4>
+                            </div>
+                            <div id="action-items" class="space-y-3">
+                                <p class="text-sm text-slate-400 italic">Analiz bekleniyor...</p>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- Strengths & Weaknesses -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+                        <!-- Strengths -->
+                        <div
+                            class="card p-6 bg-gradient-to-br from-emerald-50 to-white dark:from-emerald-900/20 dark:to-slate-800 border-emerald-200 dark:border-emerald-800">
+                            <div class="flex items-center gap-2 mb-4">
+                                <i class="fa-solid fa-trophy text-emerald-600 dark:text-emerald-400 text-xl"></i>
+                                <h4 class="font-bold text-emerald-900 dark:text-emerald-100">Güçlü Yönler</h4>
+                            </div>
+                            <div id="strengths-list" class="space-y-2">
+                                <p class="text-sm text-slate-400 italic">Analiz bekleniyor...</p>
+                            </div>
+                        </div>
+
+                        <!-- Weaknesses -->
+                        <div
+                            class="card p-6 bg-gradient-to-br from-red-50 to-white dark:from-red-900/20 dark:to-slate-800 border-red-200 dark:border-red-800">
+                            <div class="flex items-center gap-2 mb-4">
+                                <i class="fa-solid fa-triangle-exclamation text-red-600 dark:text-red-400 text-xl"></i>
+                                <h4 class="font-bold text-red-900 dark:text-red-100">İyileştirme Alanları</h4>
+                            </div>
+                            <div id="weaknesses-list" class="space-y-2">
+                                <p class="text-sm text-slate-400 italic">Analiz bekleniyor...</p>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- Distribution Analysis -->
+                    <div class="card p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center gap-2">
+                                <i class="fa-solid fa-chart-bar text-indigo-600 dark:text-indigo-400"></i>
+                                <h4 class="font-bold text-slate-800 dark:text-white">Puan Dağılım Analizi</h4>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-5 gap-3" id="score-distribution">
+                            <!-- Will be populated by JS -->
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- TAB 5: DATA EDITOR -->
+                <div id="tab-editor" class="space-y-6 tab-content hidden">
+                    <div class="card p-6 h-full flex flex-col">
+                        <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+                            <div>
+                                <h3 class="text-lg font-bold text-slate-800 dark:text-white">Veri Düzenleyici</h3>
+                                <p class="text-sm text-slate-500">Ham verileri görüntüleyin ve düzenleyin. (Değişiklik
+                                    sonrası Enter)</p>
+                            </div>
+                            <div class="flex gap-2 items-center">
+                                <span id="save-status"
+                                    class="text-sm font-bold text-emerald-600 hidden opacity-0 transition-opacity duration-300">Veriler
+                                    Kaydedildi <i class="fa-solid fa-check"></i></span>
+                                <button onclick="downloadEditedData()"
+                                    class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-200 transition">
+                                    <i class="fa-solid fa-download mr-1"></i> İndir (XLSX)
+                                </button>
+                                <button onclick="saveAndRefresh()"
+                                    class="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition shadow-sm">
+                                    <i class="fa-solid fa-save mr-1"></i> Kaydet & Analizi Yenile
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Editor Controls -->
+                        <div
+                            class="flex justify-between items-center mb-4 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                            <button onclick="changeEditorPage(-1)"
+                                class="p-2 text-slate-500 hover:text-blue-600 transition"><i
+                                    class="fa-solid fa-chevron-left"></i></button>
+                            <span class="text-sm text-slate-600" id="editor-page-info">Sayfa 1 / 1</span>
+                            <button onclick="changeEditorPage(1)"
+                                class="p-2 text-slate-500 hover:text-blue-600 transition"><i
+                                    class="fa-solid fa-chevron-right"></i></button>
+                        </div>
+
+                        <!-- Data Grid -->
+                        <div class="overflow-auto border rounded-lg border-slate-200 flex-1 relative bg-white"
+                            style="max-height: 600px;">
+                            <table class="min-w-full text-xs text-left border-collapse whitespace-nowrap"
+                                id="editor-table">
+                                <!-- Populated by JS -->
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- FOOTER -->
+                <footer class="mt-12 py-6 border-t border-slate-200 text-center text-slate-400 text-xs">
+                    <p>Abdullah Cihan tarafından oluşturulmuştur.</p>
+                </footer>
+
+            </div>
+        </div>
+    </main>
+
+
+
+    <!-- Core Scripts -->
+    <script src="js/utils.js?v=2026"></script>
+    <script src="js/ui.js?v=2026"></script>
+    <script src="js/statistics.js?v=2026"></script>
+    <script src="js/sentiment.js?v=2026"></script>
+    <script src="js/report.js?v=2026"></script>
+    <script src="js/pdf-native.js?v=2026"></script>
+    <script src="js/heatmap-themes.js?v=2026"></script>
+    <script src="js/heatmap-controls.js?v=2026"></script>
+    <script src="js/main.js?v=2026"></script>
+</body>
+
+</html>
