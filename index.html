@@ -79,6 +79,13 @@
                 <input type="file" id="fileInput" class="hidden" accept=".xlsx, .xls" onchange="handleFileSelect(this)">
             </div>
 
+            <div class="mt-6 flex items-center justify-center">
+                <button onclick="loadSampleData()"
+                    class="text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-medium underline decoration-dashed underline-offset-4 transition">
+                    <i class="fa-solid fa-vial mr-1"></i> Veya Örnek Veri ile Devam Et
+                </button>
+            </div>
+
             <div id="loader" class="loader"></div>
             <p id="statusMsg" class="text-sm text-red-500 mt-4 hidden"></p>
         </div>
