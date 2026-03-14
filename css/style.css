@@ -1,0 +1,459 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: #f8fafc;
+    color: #334155;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* Sidebar Modernization */
+.sidebar {
+    background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%);
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.02);
+    border-right: 1px solid #e2e8f0;
+}
+
+/* Modern Card */
+.card {
+    background: white;
+    border-radius: 20px;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.03), 0 4px 6px -2px rgba(0, 0, 0, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    transition: all 0.3s ease;
+}
+
+.card:hover {
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.02);
+    transform: translateY(-2px);
+}
+
+/* Chart container with min-height but allow auto growth */
+.chart-container {
+    position: relative;
+    min-height: 450px;
+    width: 100%;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* Upload Area Styles */
+.upload-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(12px);
+    z-index: 100;
+}
+
+#dropZone {
+    background: #f8fafc;
+    border: 2px dashed #cbd5e1;
+    transition: all 0.3s ease;
+}
+
+#dropZone:hover,
+.drag-active {
+    background: #eff6ff !important;
+    border-color: #3b82f6 !important;
+    transform: scale(1.02);
+}
+
+/* Loader */
+.loader {
+    border: 3px solid #f1f5f9;
+    border-top: 3px solid #3b82f6;
+    border-radius: 50%;
+    width: 48px;
+    height: 48px;
+    animation: spin 0.8s linear infinite;
+    display: none;
+    margin: 20px auto;
+}
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+/* Heatmap Table */
+.heatmap-cell {
+    position: relative;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+}
+
+.heatmap-cell:hover {
+    transform: scale(1.05);
+    z-index: 20;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    border: 2px solid #3b82f6;
+}
+
+/* Sticky Headers */
+.sticky-col-header {
+    background: rgba(248, 250, 252, 0.95);
+    backdrop-filter: blur(4px);
+}
+
+.sticky-row-header {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(4px);
+}
+
+/* Sticky First Column for Heatmap */
+#heatmap-container table th:first-child,
+#heatmap-container table td:first-child {
+    position: sticky !important;
+    left: 0 !important;
+    z-index: 10 !important;
+    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.08);
+}
+
+#heatmap-container table thead th:first-child {
+    z-index: 30 !important;
+    background: #f8fafc !important;
+}
+
+#heatmap-container table tbody td:first-child {
+    background: white !important;
+}
+
+/* Sticky Second Column for Heatmap (GENEL ORT.) */
+#heatmap-container table th:nth-child(2),
+#heatmap-container table td:nth-child(2) {
+    position: sticky !important;
+    left: 300px !important;
+    /* First column min-width */
+    z-index: 9 !important;
+    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.08);
+}
+
+#heatmap-container table thead th:nth-child(2) {
+    z-index: 29 !important;
+    background: #f8fafc !important;
+}
+
+#heatmap-container table tbody td:nth-child(2) {
+    background: #fafafa !important;
+}
+
+/* Sticky Header Row (for vertical scrolling) */
+#heatmap-container table thead th {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 20 !important;
+    background: #f8fafc !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* First column header needs highest z-index for both sticky directions */
+#heatmap-container table thead th:first-child {
+    z-index: 40 !important;
+}
+
+#heatmap-container table thead th:nth-child(2) {
+    z-index: 39 !important;
+}
+
+/* Sticky Heatmap Title and Legend */
+#sticky-heatmap-header {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    margin: -1.5rem -1.5rem 1.5rem -1.5rem;
+    padding: 1.5rem !important;
+}
+
+/* Dark mode sticky column support */
+.dark #heatmap-container table thead th:first-child {
+    background: #1e293b !important;
+}
+
+.dark #heatmap-container table tbody td:first-child {
+    background: #1e293b !important;
+}
+
+.dark #heatmap-container table thead th:nth-child(2) {
+    background: #1e293b !important;
+}
+
+.dark #heatmap-container table tbody td:nth-child(2) {
+    background: #0f172a !important;
+}
+
+.dark #heatmap-container table thead th {
+    background: #1e293b !important;
+}
+
+/* Footer sticky column */
+#heatmap-container table tfoot td:first-child,
+#heatmap-container table tr.bg-indigo-50\/50 td:first-child {
+    background: #eef2ff !important;
+}
+
+#heatmap-container table tfoot td:nth-child(2),
+#heatmap-container table tr.bg-indigo-50\/50 td:nth-child(2) {
+    background: #eef2ff !important;
+}
+
+.dark #heatmap-container table tfoot td:first-child,
+.dark #heatmap-container table tr.bg-indigo-50\/50 td:first-child {
+    background: #312e81 !important;
+}
+
+.dark #heatmap-container table tfoot td:nth-child(2),
+.dark #heatmap-container table tr.bg-indigo-50\/50 td:nth-child(2) {
+    background: #312e81 !important;
+}
+
+/* Tab Navigation */
+.tab-btn {
+    border-bottom: 2px solid transparent;
+    transition: all 0.3s ease;
+    border-radius: 8px 8px 0 0;
+    opacity: 0.7;
+}
+
+.tab-btn:hover {
+    opacity: 1;
+    background-color: #f8fafc;
+}
+
+.tab-btn.active {
+    border-bottom-color: #3b82f6;
+    color: #3b82f6;
+    background-color: #eff6ff;
+    opacity: 1;
+    font-weight: 600;
+}
+
+/* Modal */
+.modal-bg {
+    background-color: rgba(15, 23, 42, 0.4);
+    backdrop-filter: blur(4px);
+    transition: opacity 0.3s ease;
+}
+
+/* Word Cloud Items */
+.cloud-tag {
+    display: inline-block;
+    padding: 6px 14px;
+    margin: 4px;
+    border-radius: 9999px;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    cursor: pointer;
+    background-color: white;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.cloud-tag:hover {
+    transform: scale(1.1) rotate(2deg);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+    border-color: #3b82f6;
+    color: #3b82f6;
+    font-weight: 600;
+}
+
+/* Animations */
+@keyframes slideInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.animate-slide-up {
+    animation: slideInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Interactive Rows */
+tr.group:hover td {
+    background-color: #f8fafc;
+}
+
+/* Copy Feedback */
+@keyframes fadeOut {
+    0% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    100% {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+}
+
+.copy-feedback {
+    animation: fadeOut 2s forwards;
+}
+
+/* Filter Rows */
+.filter-row {
+    background: white;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+    border: 1px solid #f1f5f9;
+}
+
+/* Editor Inputs */
+.editor-input:focus {
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+/* --- DARK MODE OVERRIDES --- */
+.dark body {
+    background-color: #0f172a;
+    /* Slate 900 */
+    color: #cbd5e1;
+}
+
+.dark .card {
+    background: #1e293b;
+    /* Slate 800 */
+    border-color: #334155;
+    /* Slate 700 */
+}
+
+.dark .sidebar {
+    background: #1e293b;
+    border-right-color: #334155;
+}
+
+.dark header {
+    background: #1e293b !important;
+    border-bottom-color: #334155 !important;
+}
+
+.dark h2,
+.dark h3,
+.dark h4,
+.dark strong {
+    color: #f1f5f9 !important;
+}
+
+.dark p,
+.dark span,
+.dark label,
+.dark td {
+    color: #94a3b8;
+}
+
+.dark input,
+.dark select,
+.dark textarea {
+    background-color: #334155;
+    border-color: #475569;
+    color: #f1f5f9;
+}
+
+.dark .bg-slate-50,
+.dark .bg-gray-50 {
+    background-color: #0f172a !important;
+    /* Main Background */
+}
+
+.dark .bg-white {
+    background-color: #1e293b !important;
+}
+
+.dark .border-slate-100,
+.dark .border-slate-200 {
+    border-color: #334155 !important;
+}
+
+.dark .tab-btn:hover {
+    background-color: #334155;
+}
+
+.dark .tab-btn.active {
+    background-color: #0f172a;
+    /* Slate 900 - Matches content */
+    border-bottom-color: #0f172a;
+    /* Merge with content */
+    border-top: 2px solid #60a5fa;
+    /* Blue 400 accent on top */
+    color: #ffffff;
+    /* White text */
+}
+
+.dark .table thead {
+    background-color: #334155;
+}
+
+.dark #mainContainer {
+    background-color: #0f172a !important;
+    /* Ensure main container bg updates */
+}
+
+.dark .upload-overlay {
+    background-color: rgba(15, 23, 42, 0.9);
+}
+
+.dark .cloud-tag {
+    background-color: #334155;
+    border-color: #475569;
+    color: #e2e8f0;
+}
+
+.dark .sticky-col-header,
+.dark .sticky-row-header {
+    background: rgba(30, 41, 59, 0.95);
+}
+
+/* Smooth Transitions */
+body,
+.card,
+.sidebar,
+header,
+input,
+select,
+button {
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+/* Dark Scrollbar */
+.dark ::-webkit-scrollbar-track {
+    background: #0f172a;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+    background: #475569;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+    background: #64748b;
+}
