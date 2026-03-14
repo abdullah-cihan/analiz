@@ -137,6 +137,109 @@
     </div>
 
     <!-- SHARE MODAL -->
+    <!-- COLUMN MAPPING MODAL (NEW) -->
+    <div id="columnMappingModal"
+        class="fixed inset-0 z-[200] hidden modal-bg flex items-center justify-center p-4 backdrop-blur-sm no-print">
+        <div
+            class="bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-w-2xl w-full flex flex-col max-h-[90vh] overflow-hidden border border-slate-200 dark:border-slate-700">
+            <div
+                class="p-5 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-indigo-50 dark:bg-indigo-900/40">
+                <div>
+                    <h3 class="text-lg font-bold text-indigo-900 dark:text-indigo-100"><i
+                            class="fa-solid fa-list-check mr-2"></i>Veri Eşleştirme</h3>
+                    <p class="text-xs text-indigo-600 dark:text-indigo-300">Sistem yüklediğiniz Excel/CSV dosyasındaki
+                        sütunları aşağıdaki gibi algıladı. Eğer yanlışlık varsa lütfen düzeltin.</p>
+                </div>
+            </div>
+
+            <div class="p-4 bg-yellow-50 dark:bg-yellow-900/30 border-b border-yellow-100 dark:border-yellow-800/50">
+                <p class="text-xs text-yellow-800 dark:text-yellow-200">
+                    <strong>Puanlanan Soru:</strong> Memnuniyet belirten 1-5 arası puanlar.<br>
+                    <strong>Grup/Demografik:</strong> Karşılaştırma yapılacak kategoriler. (Örn: Departman, Yaş,
+                    Cinsiyet)<br>
+                    <strong>Görüş/Öneri:</strong> Metin halindeki açık uçlu yorumlar.<br>
+                    <strong>Sayısal (Metrik):</strong> Boy, Kilo, Yaş (sayı) gibi sürekli değerler (Gruplamayı
+                    bozmaz).<br>
+                    <strong>Yoksay:</strong> Analize dahil edilmeyecek sütunlar.
+                </p>
+
+                <!-- Bulk Selection (NEW) -->
+                <div class="mt-4 pt-4 border-t border-yellow-200 dark:border-yellow-800/80">
+                    <div
+                        class="flex flex-col gap-3 bg-white/50 dark:bg-slate-900/50 p-3 rounded-xl border border-yellow-100 dark:border-yellow-900/60 shadow-sm">
+
+                        <!-- Top Row: Define selection & type -->
+                        <div class="flex flex-col md:flex-row items-start md:items-center gap-4 w-full">
+                            <!-- Step 1: Range Selection -->
+                            <div class="flex items-center gap-2">
+                                <span
+                                    class="text-xs font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap">Aralık
+                                    Seç:</span>
+                                <div
+                                    class="flex items-center bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg p-0.5 shadow-sm overflow-hidden w-full sm:w-auto">
+                                    <input type="text" id="bulkMappingRange" placeholder="Satır (Örn: 1-5, 8)"
+                                        class="w-full sm:w-36 p-1.5 text-xs border-none bg-transparent dark:text-white dark:placeholder-slate-400 focus:outline-none text-center sm:text-left">
+                                    <button onclick="selectBulkRange()"
+                                        class="px-3 py-1.5 bg-slate-800 text-white hover:bg-slate-900 dark:bg-slate-600 dark:hover:bg-slate-500 rounded-md text-xs font-bold transition border border-transparent whitespace-nowrap">
+                                        Seç
+                                    </button>
+                                </div>
+                            </div>
+
+                            <i
+                                class="fa-solid fa-chevron-right text-slate-300 dark:text-slate-600 hidden md:inline-block px-1"></i>
+
+                            <!-- Step 2: Choose Type -->
+                            <div class="flex items-center gap-2">
+                                <span
+                                    class="text-xs font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap">Şuna
+                                    Çevir:</span>
+                                <select id="bulkMappingType"
+                                    class="w-36 p-1.5 shadow-sm text-xs font-medium border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-indigo-700 dark:text-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                    <option value="question">Puanlanan Soru</option>
+                                    <option value="group">Grup / Demografik</option>
+                                    <option value="feedback">Görüş / Öneri</option>
+                                    <option value="metric">Sayısal (Metrik)</option>
+                                    <option value="ignore" selected>Yoksay</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Bottom Row: Apply -->
+                        <div
+                            class="flex items-center justify-end border-t border-slate-200 dark:border-slate-700 pt-3 mt-1">
+                            <button onclick="applyBulkMapping('selected')"
+                                class="w-full sm:w-auto flex items-center justify-center gap-1.5 px-4 py-2 bg-indigo-600 text-white border border-indigo-700 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-500 rounded-lg text-sm font-bold transition shadow-sm">
+                                <i class="fa-regular fa-square-check"></i> <span class="whitespace-nowrap">Seçili
+                                    Olanlara Uygula</span>
+                            </button>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-4 overflow-y-auto flex-1 bg-slate-50 dark:bg-slate-900">
+                <div id="columnMappingList" class="flex flex-col gap-3">
+                    <!-- Dynamic Rows Generated by JS -->
+                </div>
+            </div>
+
+            <div
+                class="p-4 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex justify-end gap-3">
+                <button
+                    onclick="document.getElementById('columnMappingModal').classList.add('hidden'); uploadOverlay.style.display='none'; mainContainer.classList.remove('blur-sm');"
+                    class="px-4 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 rounded text-sm font-bold transition">
+                    İptal Et
+                </button>
+                <button onclick="applyColumnMapping()"
+                    class="px-6 py-2 bg-indigo-600 text-white rounded text-sm font-bold hover:bg-indigo-700 transition shadow-lg shadow-indigo-500/30">
+                    Onayla ve Analize Başla <i class="fa-solid fa-arrow-right ml-1"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <div id="shareModal"
         class="fixed inset-0 z-[100] hidden modal-bg flex items-center justify-center p-4 backdrop-blur-sm no-print">
         <div
@@ -153,11 +256,38 @@
 
             <p class="text-sm text-slate-600 dark:text-slate-300 mb-4">
                 Aşağıdaki linki kopyalayarak bu analizi başkalarıyla paylaşabilirsiniz.
-                <br><span class="text-xs text-slate-400">*Link 1 saat boyunca geçerlidir ve "Veri Yönetimi" kısmı
+                <br><span class="text-xs text-slate-400">*Link seçtiğiniz süre boyunca geçerlidir ve "Veri Yönetimi"
+                    kısmı
                     gizlenir.</span>
             </p>
 
+            <div class="space-y-4 mb-5">
+                <!-- Custom Title -->
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">Rapor Başlığı (İsteğe Bağlı)</label>
+                    <input type="text" id="shareCustomTitle" placeholder="Örn: Müşteri Memnuniyeti Raporu"
+                        class="w-full text-sm p-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded text-slate-600 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+
+                <div class="flex flex-col sm:flex-row gap-4">
+                    <!-- Expiration -->
+                    <div class="flex-1">
+                        <label class="block text-xs font-bold text-slate-500 mb-1">Geçerlilik Süresi</label>
+                        <select id="shareExpiration"
+                            class="w-full text-sm p-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded text-slate-600 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <option value="1">1 Saat</option>
+                            <option value="3">3 Saat</option>
+                            <option value="5">5 Saat</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
             <div class="flex gap-2 mb-4">
+                <button onclick="generateAndShowShareLink()"
+                    class="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-sm font-bold transition whitespace-nowrap">
+                    Link Oluştur
+                </button>
                 <input type="text" id="shareLinkInput" readonly
                     class="w-full text-xs p-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-600 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500">
                 <button onclick="copyShareLink()"
@@ -357,6 +487,12 @@
             <div class="flex items-center justify-between mb-6">
                 <h2 class="text-xl font-bold text-slate-800 dark:text-white" id="page-title">Analiz Paneli</h2>
                 <div class="flex items-center gap-3">
+                    <button onclick="reopenColumnMappingModal()" id="btn-edit-mapping"
+                        class="px-3 py-1.5 text-xs font-medium bg-slate-100 dark:bg-slate-700/50 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition flex items-center gap-2 border border-slate-200 dark:border-slate-600 shadow-sm"
+                        title="Veri Eşleştirmeyi Düzenle">
+                        <i class="fa-solid fa-list-check"></i> <span class="hidden sm:inline">Eşleştirmeyi
+                            Düzenle</span>
+                    </button>
                     <button onclick="startTour()"
                         class="px-3 py-1.5 text-xs font-medium bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 rounded-lg transition flex items-center gap-2"
                         title="Nasıl Kullanılır?">
@@ -915,9 +1051,26 @@
                     <!-- Distribution Analysis -->
                     <div class="card p-6">
                         <div class="flex items-center justify-between mb-4">
-                            <div class="flex items-center gap-2">
-                                <i class="fa-solid fa-chart-bar text-indigo-600 dark:text-indigo-400"></i>
-                                <h4 class="font-bold text-slate-800 dark:text-white">Puan Dağılım Analizi</h4>
+                            <!-- TITLE -->
+                            <h1 id="page-title"
+                                class="text-xl md:text-2xl font-bold flex items-center gap-2 mb-4 md:mb-0 truncate flex-1 md:flex-none">
+                                <i class="fa-solid fa-chart-pie text-indigo-500"></i> Etkileşimli Analiz Paneli
+                            </h1>
+
+                            <!-- HEADER RIGHT (ACTIONS) -->
+                            <div class="flex items-center gap-2 sm:gap-4 ml-auto w-full md:w-auto justify-end">
+
+                                <!-- EDIT MAPPING BTN (NEW) -->
+                                <button onclick="reopenColumnMappingModal()"
+                                    class="bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 px-3 py-2 rounded-lg text-sm border border-slate-200 dark:border-slate-700 shadow-sm transition flex items-center gap-2"
+                                    title="Veri Eşleştirmeyi Düzenle">
+                                    <i class="fa-solid fa-list-check"></i> <span class="hidden sm:inline">Eşleştirmeyi
+                                        Düzenle</span>
+                                </button>
+                                <div class="flex items-center gap-2">
+                                    <i class="fa-solid fa-chart-bar text-indigo-600 dark:text-indigo-400"></i>
+                                    <h4 class="font-bold text-slate-800 dark:text-white">Puan Dağılım Analizi</h4>
+                                </div>
                             </div>
                         </div>
                         <div class="grid grid-cols-5 gap-3" id="score-distribution">
