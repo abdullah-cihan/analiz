@@ -1,5 +1,6 @@
 // --- UI & CHARTS ---
 
+window.showChartLabels = true;
 let currentChartType = 'bar';
 let charts = {};
 let activeTab = 'general';
@@ -188,7 +189,9 @@ function switchTab(tabId) {
 
 function setChartType(type) {
     currentChartType = type;
-    ['bar', 'horizontalBar', 'line', 'radar', 'polarArea', 'area', 'scatter'].forEach(t => {
+    
+    // Normal chart buttons
+    ['bar', 'horizontalBar', 'line', 'radar', 'area', 'scatter'].forEach(t => {
         const btn = document.getElementById(`btn-${t}`);
         if (btn) {
             if (t === type) {
@@ -200,7 +203,44 @@ function setChartType(type) {
             }
         }
     });
+
+    // Circular chart dropdown container
+    const circularTypes = ['polarArea', 'pie', 'doughnut'];
+    const btnCircular = document.getElementById('btn-circular');
+    const selectCircular = document.getElementById('select-circular');
+    
+    if (btnCircular && selectCircular) {
+        if (circularTypes.includes(type)) {
+            btnCircular.classList.remove('text-slate-500', 'bg-slate-100');
+            btnCircular.classList.add('bg-blue-50', 'text-blue-700', 'shadow-sm', 'border', 'border-blue-100');
+            selectCircular.value = type;
+        } else {
+            btnCircular.classList.add('text-slate-500', 'bg-slate-100');
+            btnCircular.classList.remove('bg-blue-50', 'text-blue-700', 'shadow-sm', 'border', 'border-blue-100');
+            selectCircular.value = "";
+        }
+    }
+
     updateDashboard();
+}
+
+function toggleDataLabels() {
+    window.showChartLabels = !window.showChartLabels;
+    const btn = document.getElementById('btn-toggle-labels');
+    if (btn) {
+        if (window.showChartLabels) {
+            btn.classList.add('text-blue-600', 'dark:text-blue-400', 'bg-blue-50', 'dark:bg-blue-900/30', 'border-blue-200', 'dark:border-blue-800');
+            btn.classList.remove('text-slate-500', 'dark:text-slate-400', 'bg-white', 'dark:bg-slate-800', 'border-slate-200', 'dark:border-slate-700');
+            btn.innerHTML = '<i class="fa-solid fa-tags"></i> Değerleri Gizle';
+        } else {
+            btn.classList.remove('text-blue-600', 'dark:text-blue-400', 'bg-blue-50', 'dark:bg-blue-900/30', 'border-blue-200', 'dark:border-blue-800');
+            btn.classList.add('text-slate-500', 'dark:text-slate-400', 'bg-white', 'dark:bg-slate-800', 'border-slate-200', 'dark:border-slate-700');
+            btn.innerHTML = '<i class="fa-solid fa-tag"></i> Değerleri Göster';
+        }
+    }
+    // Update existing charts
+    if(charts['main']) charts['main'].update();
+    if(charts['timeSeries']) charts['timeSeries'].update();
 }
 
 function renderMainChart(stats, rawData = [], groupKey = 'none') {
@@ -219,10 +259,6 @@ function renderMainChart(stats, rawData = [], groupKey = 'none') {
     } else {
         container.style.height = '450px';
     }
-
-    // Is it Horizontal?
-    const isHorizontal = currentChartType === 'horizontalBar';
-    const indexAxis = isHorizontal ? 'y' : 'x';
 
 
 
@@ -346,7 +382,16 @@ function renderMainChart(stats, rawData = [], groupKey = 'none') {
                 duration: 1000,
                 easing: 'easeOutQuart'
             },
-            scales: currentChartType === 'horizontalBar'
+            scales: ['radar', 'polarArea', 'pie', 'doughnut'].includes(currentChartType) ? (
+                ['radar', 'polarArea'].includes(currentChartType) ? {
+                    r: {
+                        beginAtZero: true,
+                        max: 5.5,
+                        grid: { color: gridColor },
+                        ticks: { display: false }
+                    }
+                } : undefined
+            ) : (currentChartType === 'horizontalBar'
                 ? {
                     x: {
                         beginAtZero: true,
@@ -383,7 +428,7 @@ function renderMainChart(stats, rawData = [], groupKey = 'none') {
                             minRotation: 0
                         }
                     }
-                },
+                }),
             plugins: {
                 legend: {
                     display: groupKey !== 'none', // Show legend only if grouped
@@ -418,8 +463,7 @@ function renderMainChart(stats, rawData = [], groupKey = 'none') {
                     color: '#64748b',
                     offset: 2,
                     display: (ctx) => {
-                        // Hide datalabels if too many datasets to avoid clutter
-                        return datasets.length <= 1;
+                        return window.showChartLabels;
                     }
                 },
                 annotation: {
@@ -830,9 +874,26 @@ function renderHeatmap() {
     const groupSelect = document.getElementById('groupSelect');
     const groupKey = groupSelect.value;
 
+    const subtitleEl = document.getElementById('heatmap-subtitle');
     if (groupKey === 'none') {
         container.innerHTML = '<div class="p-10 text-center text-slate-400 bg-slate-50 rounded-xl my-4">Isı haritası için lütfen sol menüden bir karşılaştırma grubu seçin.</div>';
+        if (subtitleEl) subtitleEl.classList.add('hidden');
         return;
+    }
+
+    // Dynamic Title Generation
+    if (subtitleEl) {
+        subtitleEl.classList.remove('hidden');
+        const filterSelects = document.querySelectorAll('.dynamic-filter');
+        let filterTexts = [];
+        filterSelects.forEach(select => {
+            if (select.value !== 'all') {
+                filterTexts.push(`<strong>${select.dataset.key}:</strong> ${select.value}`);
+            }
+        });
+        const filterMsg = filterTexts.length > 0 ? `| Uygulanan Filtreler: ${filterTexts.join(', ')}` : "| Aktif filtre bulunmuyor.";
+        const groupLabel = document.querySelector(`#groupSelect option[value="${groupKey}"]`)?.textContent || groupKey;
+        subtitleEl.innerHTML = `Karşılaştırma: <strong>${groupLabel}</strong> bazında. ${filterMsg}`;
     }
 
     // Pre-calculate groups and totals for headers
@@ -885,25 +946,46 @@ function renderHeatmap() {
             ${overallAvg.toFixed(2)}
         </td>`;
 
-        // 3. Group Columns
+        // Calculate deltas and find max/min
+        const groupAverages = [];
         uniqueGroups.forEach(g => {
             const groupData = data.filter(r => r[groupKey] == g);
             const vals = groupData.map(r => r[qKey]);
             const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+            groupAverages.push({ group: g, avg: avg, count: vals.length });
+        });
 
-            // Use theme system for colors
-            const bgClass = typeof getHeatmapColorClass === 'function'
-                ? getHeatmapColorClass(avg)
-                : (avg <= 0 ? 'bg-slate-100 text-slate-400' :
-                    avg >= 4.2 ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' :
-                        avg >= 3.5 ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' :
-                            avg >= 2.5 ? 'bg-orange-100 text-orange-800 border border-orange-200' :
-                                'bg-red-100 text-red-800 border border-red-200');
+        const validAvgs = groupAverages.filter(g => g.avg > 0).map(g => g.avg);
+        const maxAvg = validAvgs.length ? Math.max(...validAvgs) : -1;
+        
+        // 3. Group Columns
+        groupAverages.forEach(gInfo => {
+            const avg = gInfo.avg;
+            const delta = avg > 0 ? avg - overallAvg : 0;
+            const deltaStr = delta > 0 ? `+${delta.toFixed(2)}` : delta.toFixed(2);
+
+            // Relative delta color logic
+            let bgClass = 'bg-slate-100 text-slate-400 border border-slate-200';
+            if (avg > 0) {
+                if (delta >= 0.20) bgClass = 'bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-sm';
+                else if (delta > 0.05) bgClass = 'bg-green-50 text-green-700 border border-green-200';
+                else if (delta >= -0.05) bgClass = 'bg-slate-50 text-slate-600 border border-slate-200';
+                else if (delta > -0.20) bgClass = 'bg-orange-100 text-orange-800 border border-orange-200';
+                else bgClass = 'bg-red-100 text-red-800 border border-red-300';
+            }
+
+            const isMax = (avg === maxAvg && avg > 0 && validAvgs.length > 1);
+            const trophyHtml = isMax ? `<span class="absolute -top-2 -right-2 drop-shadow-md text-base" title="Bu sorudaki en yüksek değer">🏆</span>` : '';
+            
+            const deltaColor = delta > 0.05 ? 'text-emerald-600' : (delta < -0.05 ? 'text-red-500' : 'text-slate-400');
+            const deltaHtml = avg > 0 ? `<span class="text-[10px] font-bold ${deltaColor} mt-1 tracking-tighter">${deltaStr}</span>` : '';
 
             html += `<td class="p-2 text-center align-middle" onclick="openModalById(${qId})">
-                <div class="cursor-pointer transition-transform hover:scale-105 rounded-lg py-2 px-3 mx-auto w-full max-w-[120px] flex flex-col items-center justify-center ${bgClass}">
-                    <span class="text-sm font-bold">${avg.toFixed(2)}</span>
-                    <span class="text-[9px] opacity-70 font-semibold mt-0.5">n:${vals.length}</span>
+                <div class="cursor-pointer transition-transform hover:scale-105 rounded-lg py-1.5 px-2 mx-auto w-full max-w-[120px] flex flex-col items-center justify-center relative ${bgClass}">
+                    ${trophyHtml}
+                    <span class="text-sm font-bold ${avg === 0 ? 'opacity-50' : ''}">${avg.toFixed(2)}</span>
+                    ${deltaHtml}
+                    <span class="text-[9px] text-slate-500 font-medium mt-0.5">n:${gInfo.count}</span>
                 </div>
             </td>`;
         });
@@ -943,19 +1025,26 @@ function renderHeatmap() {
             });
         });
         const gAvg = gCount ? (gSum / gCount) : 0;
+        const delta = gAvg > 0 ? gAvg - grandMean : 0;
+        const deltaStr = delta > 0 ? `+${delta.toFixed(2)}` : delta.toFixed(2);
 
-        // Color Logic
-        let bgClass = 'bg-slate-100 text-slate-400';
+        // Color Logic based on Delta
+        let bgClass = 'bg-slate-100 text-slate-400 border border-slate-200';
         if (gAvg > 0) {
-            if (gAvg >= 4.2) bgClass = 'bg-emerald-100 text-emerald-800 border-emerald-200';
-            else if (gAvg >= 3.5) bgClass = 'bg-yellow-100 text-yellow-800 border-yellow-200';
-            else if (gAvg >= 2.5) bgClass = 'bg-orange-100 text-orange-800 border-orange-200';
-            else bgClass = 'bg-red-100 text-red-800 border-red-200';
+            if (delta >= 0.20) bgClass = 'bg-emerald-100 text-emerald-800 border-emerald-300 shadow-sm';
+            else if (delta > 0.05) bgClass = 'bg-green-50 text-green-700 border-green-200';
+            else if (delta >= -0.05) bgClass = 'bg-slate-50 text-slate-600 border-slate-200';
+            else if (delta > -0.20) bgClass = 'bg-orange-100 text-orange-800 border-orange-200';
+            else bgClass = 'bg-red-100 text-red-800 border-red-300';
         }
+        
+        const deltaColor = delta > 0.05 ? 'text-emerald-600' : (delta < -0.05 ? 'text-red-500' : 'text-slate-400');
+        const deltaHtml = gAvg > 0 ? `<span class="text-[10px] font-bold ${deltaColor} mt-0.5 tracking-tighter">${deltaStr}</span>` : '';
 
         html += `<td class="p-3 text-center align-middle bg-indigo-50/30">
-            <div class="rounded-lg py-2 px-3 mx-auto w-full max-w-[120px] border ${bgClass}">
+            <div class="rounded-lg py-1.5 px-3 mx-auto w-full max-w-[120px] border flex flex-col items-center justify-center ${bgClass}">
                 <span class="text-sm font-extrabold">${gAvg.toFixed(2)}</span>
+                ${deltaHtml}
             </div>
         </td>`;
     });
@@ -1035,11 +1124,11 @@ function renderFeedback() {
             // Unigrams
             tokens.forEach(t => { words[t] = (words[t] || 0) + 1; });
 
-            // Bigrams Removed per User Request ("tekrarı kaldır")
-            // for (let i = 0; i < tokens.length - 1; i++) {
-            //     const bigram = tokens[i] + " " + tokens[i + 1];
-            //     words[bigram] = (words[bigram] || 0) + 1;
-            // }
+            // Bigrams (Öbekler)
+            for (let i = 0; i < tokens.length - 1; i++) {
+                const bigram = tokens[i] + " " + tokens[i + 1];
+                words[bigram] = (words[bigram] || 0) + 1;
+            }
         }
     });
 
@@ -1091,44 +1180,155 @@ function renderFeedback() {
         container.innerHTML = htmlList;
     }
 
-    // 4. Word Cloud
     const sortedWords = Object.entries(words).sort((a, b) => b[1] - a[1]).slice(0, 40);
     if (sortedWords.length === 0) {
         cloudContainer.innerHTML = '<p class="text-slate-400 w-full text-center mt-4">Analiz edilecek kelime bulunamadı.</p>';
         return;
     }
 
-    const maxCount = sortedWords[0][1];
-    const minCount = sortedWords[sortedWords.length - 1][1];
+    renderWordCloudChart(sortedWords);
+}
 
-    sortedWords.forEach(([word, count]) => {
-        const span = document.createElement('span');
-        span.className = "cloud-tag bg-white border border-slate-200 text-slate-600 shadow-sm";
-        span.textContent = `${word} (${count})`;
+function renderWordCloudChart(sortedWords) {
+    const ctx = document.getElementById('wordCloudChart');
+    if (!ctx) return;
 
-        // Dynamic Size
-        let scale = 0.5;
-        if (maxCount !== minCount) scale = (count - minCount) / (maxCount - minCount);
-        const fontSize = 0.8 + (scale * 1.5);
-        span.style.fontSize = `${fontSize}rem`;
+    if (charts['wordCloud']) {
+        charts['wordCloud'].destroy();
+    }
 
-        // Styling for popular words
-        if (scale > 0.7) {
-            span.classList.add('!bg-blue-600', '!text-white', '!border-blue-600');
-        } else if (scale > 0.4) {
-            span.classList.add('!bg-blue-50', '!text-blue-800', '!border-blue-200');
-        }
+    const labels = sortedWords.map(w => w[0]);
+    const data = sortedWords.map(w => w[1] * 10); // scale up for wordcloud
 
-        span.onclick = () => {
-            const searchBox = document.getElementById('commentSearch');
-            if (searchBox.value === word) {
-                searchBox.value = "";
-            } else {
-                searchBox.value = word;
+    charts['wordCloud'] = new Chart(ctx, {
+        type: 'wordCloud',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Kelime Frekansı',
+                data: data,
+                color: function(context) {
+                    const colors = ['#2563eb', '#3b82f6', '#60a5fa', '#93c5fd', '#1e40af'];
+                    return colors[Math.floor(Math.random() * colors.length)];
+                }
+            }]
+        },
+        options: {
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: (ctx) => `Geçiş sayısı: ${ctx.raw / 10}`
+                    }
+                }
             }
-            renderFeedback(); // Re-render to filter
-        };
-        cloudContainer.appendChild(span);
+        }
+    });
+}
+
+function renderTimeSeriesChart(data) {
+    const container = document.getElementById('time-series-container');
+    const ctx = document.getElementById('timeSeriesChart');
+    
+    // Check if we have date columns mapped
+    if (typeof dateColumns === 'undefined' || dateColumns.length === 0 || !container || !ctx) {
+        if(container) container.classList.add('hidden');
+        return;
+    }
+
+    const dateCol = dateColumns[0].key;
+    
+    // Group data by Date/Month
+    const timeData = {};
+    
+    data.forEach(row => {
+        let rawDate = row[dateCol];
+        if(!rawDate) return;
+        
+        let dateObj;
+        
+        // Basic Excel serial date conversion (approximation if it's a number)
+        if(!isNaN(rawDate) && rawDate > 25000) {
+             dateObj = new Date((rawDate - (25567 + 2)) * 86400 * 1000); 
+        } else {
+             dateObj = new Date(rawDate);
+        }
+        
+        if(isNaN(dateObj.getTime())) return; // Invalid date
+        
+        // Format to YYYY-MM
+        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const year = dateObj.getFullYear();
+        const periodKey = `${year}-${month}`;
+        
+        if(!timeData[periodKey]) {
+            timeData[periodKey] = { sum: 0, count: 0 };
+        }
+        
+        // Calculate average satisfaction for this row
+        let rowSum = 0, rowQCount = 0;
+        if(typeof questionList !== 'undefined') {
+             questionList.forEach((_, i) => {
+                 const qVal = row[`Q${i + 1}`];
+                 if (qVal) { rowSum += qVal; rowQCount++; }
+             });
+        }
+        
+        if(rowQCount > 0) {
+            timeData[periodKey].sum += (rowSum / rowQCount);
+            timeData[periodKey].count++;
+        }
+    });
+    
+    const periods = Object.keys(timeData).sort(); // Sort chronologically
+    if(periods.length === 0) {
+        container.classList.add('hidden');
+        return;
+    }
+    
+    container.classList.remove('hidden');
+    
+    const labels = periods;
+    const dataPoints = periods.map(p => parseFloat((timeData[p].sum / timeData[p].count).toFixed(2)));
+
+    if (charts['timeSeries']) {
+        charts['timeSeries'].destroy();
+    }
+
+    charts['timeSeries'] = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Ortalama Memnuniyet',
+                data: dataPoints,
+                borderColor: '#3b82f6',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                borderWidth: 2,
+                pointBackgroundColor: '#2563eb',
+                pointRadius: 4,
+                fill: true,
+                tension: 0.3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: { min: 1, max: 5 }
+            },
+            plugins: {
+                legend: { display: false },
+                datalabels: {
+                    align: 'top',
+                    anchor: 'end',
+                    offset: 4,
+                    color: '#1e40af',
+                    font: { weight: 'bold', size: 10 },
+                    display: (ctx) => window.showChartLabels
+                }
+            }
+        }
     });
 }
 

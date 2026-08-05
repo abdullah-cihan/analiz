@@ -131,7 +131,7 @@ function findClosestMatch(word, dictArray) {
 
     for (let dictWord of dictArray) {
         if (Math.abs(word.length - dictWord.length) > allowedDistance) continue;
-        
+
         const dist = getLevenshteinDistance(word, dictWord);
         if (dist <= allowedDistance && dist < lowestDistance) {
             lowestDistance = dist;
@@ -216,7 +216,7 @@ function analyzeSentiment(text) {
                 score += 1 * multiplier;
                 matched.push(logTag);
             }
-        } 
+        }
         else if (negResult) {
             let logTag = negResult.isFuzzy ? `-${negResult.match} (düzeltildi: ${word})` : `-${word}`;
             if (isNegated) {
@@ -226,7 +226,7 @@ function analyzeSentiment(text) {
                 score -= 1 * multiplier;
                 matched.push(logTag);
             }
-        } 
+        }
         else if (neuResult) {
             let logTag = neuResult.isFuzzy ? `=${neuResult.match} (düzeltildi: ${word})` : `=${word}`;
             matched.push(logTag);
@@ -242,7 +242,7 @@ function analyzeSentiment(text) {
     let type = "neutral";
     if (score > 1) type = "positive";
     else if (score < -1) type = "negative";
-    if (conditional && Math.abs(score) > 0) type = "mixed"; 
+    if (conditional && Math.abs(score) > 0) type = "mixed";
 
     const confidence = parseFloat(Math.min(Math.abs(score) / 4, 1).toFixed(2));
 

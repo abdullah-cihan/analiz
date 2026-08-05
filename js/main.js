@@ -6,6 +6,7 @@ window.questionList = [];
 window.groupingCandidates = [];
 window.feedbackColumns = [];
 window.multiSelectCandidates = [];
+window.dateColumns = [];
 window.currentFilters = []; // Global filter state for sharing
 
 // DOM Elements (Explicit Definition)
@@ -75,6 +76,12 @@ function generateSampleData() {
         row['Lokasyon'] = locations[Math.floor(Math.random() * locations.length)];
         row['Kıdem Yılı'] = Math.floor(Math.random() * 15) + 1; // 1-15 years
 
+        // Date (Random date within the last 6 months)
+        const pastDate = new Date();
+        pastDate.setMonth(pastDate.getMonth() - Math.floor(Math.random() * 6));
+        pastDate.setDate(Math.floor(Math.random() * 28) + 1);
+        row['Anket Tarihi'] = pastDate.toISOString().split('T')[0];
+
         // Likert Questions (Weighted random for realism)
         questions.forEach((q, idx) => {
             // Skew towards positive results generally (3, 4, 5)
@@ -98,17 +105,26 @@ function generateSampleData() {
         row['Kullandığınız Araçlar (Çoklu Seçim)'] = selectedTools.join('; ');
 
         // Feedback (Random sentiments)
+        // Feedback (Random sentiments with repeating phrases to test Word Cloud bigrams)
         const sentiments = [
-            "Genel olarak çalışma ortamından memnunum ancak sosyal alanlar geliştirilebilir.",
-            "Yöneticim çok ilgili, teşekkürler.",
-            "Maaş artış oranları beklentimin altında kaldı.",
-            "Eğitim fırsatları daha fazla olmalı diye düşünüyorum.",
-            "Harika bir ekip ortamımız var, herkes çok yardımcı.",
-            "Yemekhane kalitesi artırılmalı.",
-            "Uzaktan çalışma imkanları çok değerli.",
-            "İletişim kopuklukları yaşanabiliyor bazen.",
-            "Şirketin vizyonuna inanıyorum.",
-            "Toplantı süreleri çok uzun, daha verimli olabilir."
+            "Çalışma ortamından genel olarak çok memnunum ancak sosyal alanlar kesinlikle geliştirilebilir.",
+            "Yöneticim çok ilgili ve destekleyici, ekip içi iletişim harika.",
+            "Maaş artış oranları enflasyon karşısında ve beklentimin altında kaldı.",
+            "Eğitim fırsatları daha fazla olmalı, kişisel gelişim önemsenmeli.",
+            "Harika bir ekip ortamımız var, herkes çok yardımcı oluyor.",
+            "Yemekhane kalitesi artırılmalı, menüler çok tekdüze.",
+            "Uzaktan çalışma imkanları ve esnek çalışma saatleri çok değerli.",
+            "İletişim kopuklukları yaşanabiliyor, departmanlar arası iletişim çok zayıf.",
+            "Şirketin vizyonuna inanıyorum, kariyer fırsatları umut verici.",
+            "Toplantı süreleri çok uzun, daha verimli olabilir.",
+            "Çalışma ortamı çok huzurlu, sosyal haklar tatmin edici düzeyde.",
+            "Esnek çalışma modeli sayesinde iş-özel hayat dengesi kurabiliyorum.",
+            "Maaş artış politikası daha şeffaf olmalı.",
+            "Yemekhane kalitesi bazen düşüyor, hijyene dikkat edilmeli.",
+            "Departmanlar arası iletişim kopukluğu işleri yavaşlatıyor.",
+            "Sosyal haklar ve yan haklar paketi sektör ortalamasının altında.",
+            "Kariyer fırsatları konusunda yöneticim çok destekleyici.",
+            "Açık ofis çalışma ortamı maalesef çok gürültülü ve dikkat dağıtıcı."
         ];
 
         // Add feedback to 40% of rows
@@ -202,7 +218,8 @@ function autoDetectColumns(headers, json) {
         qKeys: [],
         potentialGroupKeys: [],
         feedbackColumns: [],
-        multiSelectCandidates: []
+        multiSelectCandidates: [],
+        dateColumns: []
     };
 
     detected.qKeys = headers.filter(h => {
@@ -248,9 +265,12 @@ function autoDetectColumns(headers, json) {
 
         const lowerKey = key.toLowerCase();
         let isFeedback = false;
+        let isDate = false;
 
         if (lowerKey.includes('görüş') || lowerKey.includes('öneri') || lowerKey.includes('ifade') || lowerKey.includes('düşünce')) {
             isFeedback = true;
+        } else if (lowerKey.includes('tarih') || lowerKey.includes('zaman') || lowerKey.includes('date') || lowerKey.includes('time')) {
+            isDate = true;
         }
 
         if (isFeedback) {
@@ -258,6 +278,8 @@ function autoDetectColumns(headers, json) {
             if (sampleVal && isNaN(parseInt(sampleVal))) {
                 detected.feedbackColumns.push(key);
             }
+        } else if (isDate) {
+            detected.dateColumns.push(key);
         }
     });
 
@@ -277,6 +299,8 @@ function openColumnMappingModal(headers) {
             defaultType = 'question';
         } else if (detected.feedbackColumns.includes(header)) {
             defaultType = 'feedback';
+        } else if (detected.dateColumns && detected.dateColumns.includes(header)) {
+            defaultType = 'date';
         } else if (detected.potentialGroupKeys.includes(header)) { // Simplification: if not Q or Feedback, suggest Group (if it looks like one, but mostly let user decide)
             // Let's suggest 'group' if it's not a question or feedback, but has low cardinality.
             // For simplicity in UI, we'll default others to group or ignore.
@@ -296,6 +320,7 @@ function openColumnMappingModal(headers) {
                         <option value="group" ${defaultType === 'group' ? 'selected' : ''}>Grup / Demografik</option>
                         <option value="feedback" ${defaultType === 'feedback' ? 'selected' : ''}>Görüş / Öneri</option>
                         <option value="metric" ${defaultType === 'metric' ? 'selected' : ''}>Sayısal (Metrik)</option>
+                        <option value="date" ${defaultType === 'date' ? 'selected' : ''}>Tarih / Zaman</option>
                         <option value="ignore" ${defaultType === 'ignore' ? 'selected' : ''}>Yoksay</option>
                     </select>
                 </div>
@@ -407,6 +432,7 @@ function applyColumnMapping() {
         groups: [],
         feedbacks: [],
         metrics: [],
+        dates: [],
         ignored: []
     };
 
@@ -418,6 +444,7 @@ function applyColumnMapping() {
         else if (type === 'group') userMapping.groups.push(header);
         else if (type === 'feedback') userMapping.feedbacks.push(header);
         else if (type === 'metric') userMapping.metrics.push(header);
+        else if (type === 'date') userMapping.dates.push(header);
         else userMapping.ignored.push(header);
     });
 
@@ -454,6 +481,7 @@ function analyzeAndProcess(json, customMapping = null) {
         groupingCandidates = [];
         feedbackColumns = [];
         multiSelectCandidates = [];
+        dateColumns = [];
 
         if (customMapping) {
             // --- MANUAL MAPPING MODE ---
@@ -488,6 +516,13 @@ function analyzeAndProcess(json, customMapping = null) {
             customMapping.feedbacks.forEach(key => {
                 feedbackColumns.push({ key: key, label: key });
             });
+
+            // Process Dates
+            if (customMapping.dates) {
+                customMapping.dates.forEach(key => {
+                    dateColumns.push({ key: key, label: key });
+                });
+            }
 
         } else {
             // --- AUTOMATIC FALLBACK (Should rarely be hit now, mainly for checkSharedUrl) ---
@@ -532,13 +567,18 @@ function analyzeAndProcess(json, customMapping = null) {
 
                 const lowerKey = key.toLowerCase();
                 let isFeedback = false;
+                let isDate = false;
 
                 if (lowerKey.includes('görüş') || lowerKey.includes('öneri') || lowerKey.includes('ifade') || lowerKey.includes('düşünce')) {
                     isFeedback = true;
+                } else if (lowerKey.includes('tarih') || lowerKey.includes('zaman') || lowerKey.includes('date') || lowerKey.includes('time')) {
+                    isDate = true;
                 }
 
                 if (isFeedback) {
                     feedbackColumns.push({ key: key, label: key });
+                } else if (isDate) {
+                    dateColumns.push({ key: key, label: key });
                 }
             });
         } // End of customMapping else block
@@ -699,13 +739,27 @@ function getFilteredData() {
     if (rawData.length === 0) return [];
 
     const filterSelects = document.querySelectorAll('.dynamic-filter');
+    
+    // Filtreleri sütun adına (key) göre grupla
+    const filtersByKey = {};
+    filterSelects.forEach(select => {
+        if (select.value !== 'all') {
+            const key = select.dataset.key;
+            if (!filtersByKey[key]) filtersByKey[key] = [];
+            filtersByKey[key].push(select.value);
+        }
+    });
+
     return rawData.filter(row => {
         let pass = true;
-        filterSelects.forEach(select => {
-            if (select.value !== 'all') {
-                if (row[select.dataset.key] != select.value) pass = false;
+        // Farklı kategoriler arasında "VE", aynı kategori içinde "VEYA" mantığı
+        for (const key in filtersByKey) {
+            const allowedValues = filtersByKey[key];
+            if (!allowedValues.includes(String(row[key]))) {
+                pass = false;
+                break; // Bu kategori için hiçbir değer eşleşmediyse satırı atla
             }
-        });
+        }
         return pass;
     });
 }
@@ -773,6 +827,10 @@ function updateDashboard() {
     renderCorrelations(data);
     renderDetailTable(questionStats);
 
+    if (typeof renderTimeSeriesChart === 'function') {
+        renderTimeSeriesChart(data);
+    }
+
     // Render Heatmap if tab active
     if (activeTab === 'heatmap') renderHeatmap();
 
@@ -823,7 +881,7 @@ function exportTableToExcel() {
 
 // --- SHARE ANALYSIS FUNCTIONS ---
 
-function generateShareLink(durationHours = 1, customTitle = "", readOnly = true) {
+function generateShareLink(durationHours = 1, customTitle = "", readOnly = true, pin = "", permissions = {}, note = "") {
     if (!originalJson || originalJson.length === 0) {
         alert("Paylaşılacak veri bulunamadı.");
         return null;
@@ -848,7 +906,10 @@ function generateShareLink(durationHours = 1, customTitle = "", readOnly = true)
         options: {
             title: customTitle,
             savedGroup: currentGroup,
-            savedFilters: currentFilters
+            savedFilters: currentFilters,
+            pin: pin,
+            permissions: permissions,
+            note: note
         }
     };
 
@@ -869,18 +930,48 @@ function generateShareLink(durationHours = 1, customTitle = "", readOnly = true)
 function generateAndShowShareLink() {
     const durationHours = parseInt(document.getElementById('shareExpiration').value) || 1;
     const customTitle = document.getElementById('shareCustomTitle').value.trim();
+    const pin = document.getElementById('sharePin') ? document.getElementById('sharePin').value.trim() : "";
+    const note = document.getElementById('shareManagerNote') ? document.getElementById('shareManagerNote').value.trim() : "";
+    
+    const permissions = {
+        hideFeedback: document.getElementById('shareHideFeedback') ? document.getElementById('shareHideFeedback').checked : false,
+        hideEditor: document.getElementById('shareHideEditor') ? document.getElementById('shareHideEditor').checked : true
+    };
 
-    const link = generateShareLink(durationHours, customTitle);
+    const link = generateShareLink(durationHours, customTitle, true, pin, permissions, note);
     if (link) {
         const input = document.getElementById('shareLinkInput');
         input.value = link;
         document.getElementById('share-copy-msg').textContent = 'Link oluşturuldu!';
+        
+        // Generate QR Code
+        const qrCanvas = document.getElementById('shareQRCode');
+        const qrContainer = document.getElementById('qrCodeContainer');
+        if (qrCanvas && typeof QRious !== 'undefined') {
+            new QRious({
+                element: qrCanvas,
+                value: link,
+                size: 150,
+                background: 'white',
+                foreground: 'black'
+            });
+            if (qrContainer) qrContainer.classList.remove('hidden');
+        }
     }
 }
 
 function openShareModal() {
     const input = document.getElementById('shareLinkInput');
     input.value = '';
+    
+    // Reset fields
+    const noteEl = document.getElementById('shareManagerNote');
+    if(noteEl) noteEl.value = '';
+    const pinEl = document.getElementById('sharePin');
+    if(pinEl) pinEl.value = '';
+    const qrContainer = document.getElementById('qrCodeContainer');
+    if(qrContainer) qrContainer.classList.add('hidden');
+    
     document.getElementById('shareModal').classList.remove('hidden');
     document.getElementById('share-copy-msg').textContent = '';
 }
@@ -903,6 +994,58 @@ function copyShareLink() {
         document.execCommand('copy');
         document.getElementById('share-copy-msg').textContent = 'Link kopyalandı!';
     }
+}
+
+function showPinPrompt(expectedPin, onSuccess, onFailure) {
+    const modal = document.getElementById('pinPromptModal');
+    const input = document.getElementById('pinPromptInput');
+    const submitBtn = document.getElementById('pinPromptSubmitBtn');
+    const cancelBtn = document.getElementById('pinPromptCancelBtn');
+
+    if (!modal) {
+        // Fallback if modal not present
+        const entered = prompt("Bu analizi görüntülemek için 4 haneli şifreyi (PIN) giriniz:");
+        if (entered === expectedPin) onSuccess();
+        else onFailure();
+        return;
+    }
+
+    input.value = '';
+    modal.classList.remove('hidden');
+    input.focus();
+
+    const handleSubmit = () => {
+        const entered = input.value.trim();
+        if (entered === expectedPin) {
+            cleanup();
+            onSuccess();
+        } else {
+            alert("Hatalı şifre!");
+            input.value = '';
+            input.focus();
+        }
+    };
+
+    const handleCancel = () => {
+        cleanup();
+        onFailure();
+    };
+
+    const handleKeydown = (e) => {
+        if (e.key === 'Enter') handleSubmit();
+        if (e.key === 'Escape') handleCancel();
+    };
+
+    const cleanup = () => {
+        modal.classList.add('hidden');
+        submitBtn.removeEventListener('click', handleSubmit);
+        cancelBtn.removeEventListener('click', handleCancel);
+        input.removeEventListener('keydown', handleKeydown);
+    };
+
+    submitBtn.addEventListener('click', handleSubmit);
+    cancelBtn.addEventListener('click', handleCancel);
+    input.addEventListener('keydown', handleKeydown);
 }
 
 function checkSharedUrl() {
@@ -933,116 +1076,131 @@ function checkSharedUrl() {
                 const customTitle = options.title || "";
                 const savedGroup = options.savedGroup || 'none';
                 const savedFilters = options.savedFilters || [];
+                const pin = options.pin || "";
+                const permissions = options.permissions || {};
+                const note = options.note || "";
 
-                // Load Data
-                originalJson = parsed.data; // Keep originalJson updated for other functions
-                analyzeAndProcess(parsed.data);
+                const loadData = () => {
+                    // Load Data
+                    originalJson = parsed.data; // Keep originalJson updated for other functions
+                    analyzeAndProcess(parsed.data);
 
-                // Restore Filter States if Available
-                if (savedGroup !== 'none') {
-                    const groupSelect = document.getElementById('groupSelect');
-                    if (groupSelect) {
-                        groupSelect.value = savedGroup;
-                        updateDashboard(); // Apply the grouping
-                    }
-                }
-
-                if (savedFilters.length > 0) {
-                    currentFilters = savedFilters;
-
-                    // Visually Reconstruct the Dynamic Filters UI
-                    const container = document.getElementById('dynamicFilters');
-                    const noMsg = document.getElementById('no-filter-msg');
-                    if (noMsg) noMsg.remove();
-                    container.innerHTML = ''; // Temizle
-
-                    savedFilters.forEach((filter, index) => {
-                        const wrapper = document.createElement('div');
-                        wrapper.className = "filter-row bg-slate-50 p-2 rounded-lg border border-slate-200 relative mb-2";
-
-                        const flexDiv = document.createElement('div');
-                        flexDiv.className = "flex gap-2 mb-1 pr-6";
-
-                        const colSelect = document.createElement('select');
-                        colSelect.className = "w-1/2 bg-white border border-slate-200 text-slate-700 text-xs rounded focus:ring-blue-500 focus:border-blue-500 p-1.5";
-
-                        groupingCandidates.forEach(cand => {
-                            const opt = document.createElement('option');
-                            opt.value = cand.key;
-                            opt.textContent = cand.label;
-                            if (cand.key === filter.key) opt.selected = true;
-                            colSelect.appendChild(opt);
-                        });
-
-                        const valSelect = document.createElement('select');
-                        valSelect.className = "dynamic-filter w-1/2 bg-white border border-slate-200 text-slate-700 text-xs rounded focus:ring-blue-500 focus:border-blue-500 p-1.5";
-                        valSelect.dataset.key = filter.key;
-
-                        const candidate = groupingCandidates.find(c => c.key === filter.key);
-                        const optAll = document.createElement('option');
-                        optAll.value = "all";
-                        optAll.textContent = "Tümü";
-                        valSelect.appendChild(optAll);
-
-                        if (candidate) {
-                            candidate.options.forEach(optVal => {
-                                const opt = document.createElement('option');
-                                opt.value = optVal;
-                                opt.textContent = optVal;
-                                if (optVal === filter.value) opt.selected = true;
-                                valSelect.appendChild(opt);
-                            });
+                    // Restore Filter States if Available
+                    if (savedGroup !== 'none') {
+                        const groupSelect = document.getElementById('groupSelect');
+                        if (groupSelect) {
+                            groupSelect.value = savedGroup;
+                            updateDashboard(); // Apply the grouping
                         }
+                    }
 
-                        const removeBtn = document.createElement('button');
-                        removeBtn.className = "absolute top-2 right-2 text-slate-400 hover:text-red-500 transition";
-                        removeBtn.innerHTML = '<i class="fa-solid fa-times"></i>';
-                        removeBtn.onclick = () => {
-                            wrapper.remove();
-                            if (container.children.length === 0) {
-                                container.innerHTML = '<p class="text-xs text-slate-400 italic" id="no-filter-msg">Henüz filtre eklenmedi.</p>';
-                            }
-                            updateDashboard();
-                        };
+                    if (savedFilters.length > 0) {
+                        currentFilters = savedFilters;
 
-                        const updateValSelect = () => {
-                            const selectedKey = colSelect.value;
-                            const cand = groupingCandidates.find(c => c.key === selectedKey);
-                            valSelect.innerHTML = '<option value="all">Tümü</option>';
-                            valSelect.dataset.key = selectedKey;
-                            if (cand) {
-                                cand.options.forEach(optVal => {
+                        // Visually Reconstruct the Dynamic Filters UI
+                        const container = document.getElementById('dynamicFilters');
+                        const noMsg = document.getElementById('no-filter-msg');
+                        if (noMsg) noMsg.remove();
+                        container.innerHTML = ''; // Temizle
+
+                        savedFilters.forEach((filter, index) => {
+                            const wrapper = document.createElement('div');
+                            wrapper.className = "filter-row bg-slate-50 p-2 rounded-lg border border-slate-200 relative mb-2";
+
+                            const flexDiv = document.createElement('div');
+                            flexDiv.className = "flex gap-2 mb-1 pr-6";
+
+                            const colSelect = document.createElement('select');
+                            colSelect.className = "w-1/2 bg-white border border-slate-200 text-slate-700 text-xs rounded focus:ring-blue-500 focus:border-blue-500 p-1.5";
+
+                            groupingCandidates.forEach(cand => {
+                                const opt = document.createElement('option');
+                                opt.value = cand.key;
+                                opt.textContent = cand.label;
+                                if (cand.key === filter.key) opt.selected = true;
+                                colSelect.appendChild(opt);
+                            });
+
+                            const valSelect = document.createElement('select');
+                            valSelect.className = "dynamic-filter w-1/2 bg-white border border-slate-200 text-slate-700 text-xs rounded focus:ring-blue-500 focus:border-blue-500 p-1.5";
+                            valSelect.dataset.key = filter.key;
+
+                            const candidate = groupingCandidates.find(c => c.key === filter.key);
+                            const optAll = document.createElement('option');
+                            optAll.value = "all";
+                            optAll.textContent = "Tümü";
+                            valSelect.appendChild(optAll);
+
+                            if (candidate) {
+                                candidate.options.forEach(optVal => {
                                     const opt = document.createElement('option');
                                     opt.value = optVal;
                                     opt.textContent = optVal;
+                                    if (optVal === filter.value) opt.selected = true;
                                     valSelect.appendChild(opt);
                                 });
                             }
-                            updateDashboard();
-                        };
 
-                        colSelect.onchange = updateValSelect;
-                        valSelect.onchange = updateDashboard;
+                            const removeBtn = document.createElement('button');
+                            removeBtn.className = "absolute top-2 right-2 text-slate-400 hover:text-red-500 transition";
+                            removeBtn.innerHTML = '<i class="fa-solid fa-times"></i>';
+                            removeBtn.onclick = () => {
+                                wrapper.remove();
+                                if (container.children.length === 0) {
+                                    container.innerHTML = '<p class="text-xs text-slate-400 italic" id="no-filter-msg">Henüz filtre eklenmedi.</p>';
+                                }
+                                updateDashboard();
+                            };
 
-                        flexDiv.appendChild(colSelect);
-                        flexDiv.appendChild(valSelect);
-                        wrapper.appendChild(flexDiv);
-                        wrapper.appendChild(removeBtn);
-                        container.appendChild(wrapper);
+                            const updateValSelect = () => {
+                                const selectedKey = colSelect.value;
+                                const cand = groupingCandidates.find(c => c.key === selectedKey);
+                                valSelect.dataset.key = selectedKey;
+                                valSelect.innerHTML = '<option value="all">Tümü</option>';
+                                if (cand) {
+                                    cand.options.forEach(optVal => {
+                                        const opt = document.createElement('option');
+                                        opt.value = optVal;
+                                        opt.textContent = optVal;
+                                        valSelect.appendChild(opt);
+                                    });
+                                }
+                                updateDashboard();
+                            };
+
+                            colSelect.onchange = updateValSelect;
+                            valSelect.onchange = updateDashboard;
+
+                            flexDiv.appendChild(colSelect);
+                            flexDiv.appendChild(valSelect);
+                            wrapper.appendChild(flexDiv);
+                            wrapper.appendChild(removeBtn);
+                            container.appendChild(wrapper);
+                        });
+
+                        updateDashboard(); // Re-render visuals using these filters
+                    }
+
+                    // Setup View Mode
+                    enableSharedViewMode(parsed.expiresAt, customTitle, permissions, note);
+
+                    loader.style.display = 'none';
+                    uploadOverlay.style.opacity = '0';
+                    setTimeout(() => {
+                        uploadOverlay.style.display = 'none';
+                        mainContainer.classList.remove('blur-sm');
+                    }, 500);
+                };
+
+                if (pin.length > 0) {
+                    showPinPrompt(pin, loadData, () => {
+                        loader.style.display = 'none';
+                        statusMsg.classList.add('hidden');
+                        window.location.hash = ''; // Remove invalid hash
                     });
-
-                    updateDashboard(); // Re-render visuals using these filters
+                } else {
+                    loadData();
                 }
-
-                // Setup View Mode
-                enableSharedViewMode(parsed.expiresAt, customTitle);
-
-                loader.style.display = 'none';
-                uploadOverlay.style.opacity = '0';
-                setTimeout(() => {
-                    uploadOverlay.style.display = 'none';
-                    mainContainer.classList.remove('blur-sm');
-                }, 500);
 
             }, 100);
 
@@ -1069,10 +1227,38 @@ function checkSharedUrl() {
     }
 }
 
-function enableSharedViewMode(expiresAt, customTitle = "") {
-    // Hide Data Editor Tab
+function enableSharedViewMode(expiresAt, customTitle = "", permissions = {}, note = "") {
+    // Hide Data Editor Tab (always or by permission)
     const editorTabBtn = document.getElementById('tab-btn-editor');
-    if (editorTabBtn) editorTabBtn.style.display = 'none';
+    if (editorTabBtn && permissions.hideEditor !== false) {
+        editorTabBtn.style.display = 'none';
+    }
+    
+    // Hide Feedback Tab if requested
+    const feedbackTabBtn = document.getElementById('tab-btn-feedback');
+    if (feedbackTabBtn && permissions.hideFeedback === true) {
+        feedbackTabBtn.style.display = 'none';
+    }
+
+    // Add Manager Note if exists
+    if (note && note.trim().length > 0) {
+        const header = document.querySelector('header');
+        if (header) {
+            // Check if note already exists to prevent duplicates on multiple calls
+            if (!document.getElementById('shared-manager-note')) {
+                const noteHtml = `
+                    <div id="shared-manager-note" class="mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-700 rounded-lg flex items-start gap-3 shadow-sm mx-4 sm:mx-6 lg:mx-8 mb-4">
+                        <i class="fa-solid fa-circle-info text-yellow-500 mt-1"></i>
+                        <div>
+                            <h4 class="text-xs font-bold text-yellow-700 dark:text-yellow-400 mb-1">Yönetici Notu</h4>
+                            <p class="text-sm text-yellow-800 dark:text-yellow-200">${note.replace(/\n/g, '<br>')}</p>
+                        </div>
+                    </div>
+                `;
+                header.insertAdjacentHTML('afterend', noteHtml);
+            }
+        }
+    }
 
     // Add visual indicator and countdown
     const title = document.getElementById('page-title');
