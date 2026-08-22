@@ -881,7 +881,7 @@ function exportTableToExcel() {
 
 // --- SHARE ANALYSIS FUNCTIONS ---
 
-function generateShareLink(durationHours = 1, customTitle = "", readOnly = true, pin = "", permissions = {}, note = "") {
+function generateShareLink(durationHours = 1, customTitle = "", readOnly = true, permissions = {}, note = "") {
     if (!originalJson || originalJson.length === 0) {
         alert("Paylaşılacak veri bulunamadı.");
         return null;
@@ -907,7 +907,6 @@ function generateShareLink(durationHours = 1, customTitle = "", readOnly = true,
             title: customTitle,
             savedGroup: currentGroup,
             savedFilters: currentFilters,
-            pin: pin,
             permissions: permissions,
             note: note
         }
@@ -930,7 +929,6 @@ function generateShareLink(durationHours = 1, customTitle = "", readOnly = true,
 function generateAndShowShareLink() {
     const durationHours = parseInt(document.getElementById('shareExpiration').value) || 1;
     const customTitle = document.getElementById('shareCustomTitle').value.trim();
-    const pin = document.getElementById('sharePin') ? document.getElementById('sharePin').value.trim() : "";
     const note = document.getElementById('shareManagerNote') ? document.getElementById('shareManagerNote').value.trim() : "";
     
     const permissions = {
@@ -938,7 +936,7 @@ function generateAndShowShareLink() {
         hideEditor: document.getElementById('shareHideEditor') ? document.getElementById('shareHideEditor').checked : true
     };
 
-    const link = generateShareLink(durationHours, customTitle, true, pin, permissions, note);
+    const link = generateShareLink(durationHours, customTitle, true, permissions, note);
     if (link) {
         const input = document.getElementById('shareLinkInput');
         input.value = link;
@@ -996,57 +994,6 @@ function copyShareLink() {
     }
 }
 
-function showPinPrompt(expectedPin, onSuccess, onFailure) {
-    const modal = document.getElementById('pinPromptModal');
-    const input = document.getElementById('pinPromptInput');
-    const submitBtn = document.getElementById('pinPromptSubmitBtn');
-    const cancelBtn = document.getElementById('pinPromptCancelBtn');
-
-    if (!modal) {
-        // Fallback if modal not present
-        const entered = prompt("Bu analizi görüntülemek için 4 haneli şifreyi (PIN) giriniz:");
-        if (entered === expectedPin) onSuccess();
-        else onFailure();
-        return;
-    }
-
-    input.value = '';
-    modal.classList.remove('hidden');
-    input.focus();
-
-    const handleSubmit = () => {
-        const entered = input.value.trim();
-        if (entered === expectedPin) {
-            cleanup();
-            onSuccess();
-        } else {
-            alert("Hatalı şifre!");
-            input.value = '';
-            input.focus();
-        }
-    };
-
-    const handleCancel = () => {
-        cleanup();
-        onFailure();
-    };
-
-    const handleKeydown = (e) => {
-        if (e.key === 'Enter') handleSubmit();
-        if (e.key === 'Escape') handleCancel();
-    };
-
-    const cleanup = () => {
-        modal.classList.add('hidden');
-        submitBtn.removeEventListener('click', handleSubmit);
-        cancelBtn.removeEventListener('click', handleCancel);
-        input.removeEventListener('keydown', handleKeydown);
-    };
-
-    submitBtn.addEventListener('click', handleSubmit);
-    cancelBtn.addEventListener('click', handleCancel);
-    input.addEventListener('keydown', handleKeydown);
-}
 
 function checkSharedUrl() {
     const hash = window.location.hash;
@@ -1076,7 +1023,6 @@ function checkSharedUrl() {
                 const customTitle = options.title || "";
                 const savedGroup = options.savedGroup || 'none';
                 const savedFilters = options.savedFilters || [];
-                const pin = options.pin || "";
                 const permissions = options.permissions || {};
                 const note = options.note || "";
 
@@ -1192,15 +1138,7 @@ function checkSharedUrl() {
                     }, 500);
                 };
 
-                if (pin.length > 0) {
-                    showPinPrompt(pin, loadData, () => {
-                        loader.style.display = 'none';
-                        statusMsg.classList.add('hidden');
-                        window.location.hash = ''; // Remove invalid hash
-                    });
-                } else {
                     loadData();
-                }
 
             }, 100);
 

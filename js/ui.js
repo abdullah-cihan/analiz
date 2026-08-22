@@ -1982,8 +1982,8 @@ function startTour() {
             { element: '#distChart', popover: { title: '11. Katılımcı Dağılımı', description: 'Anketi hangi grupların cevapladığını gösteren dağılım grafiği.' } },
             { element: '#correlation-container', popover: { title: '12. İlişki Analizi', description: 'Sorular arasındaki korelasyonları keşfedin.' } },
             { element: '#questions-table', popover: { title: '13. Detay Tablosu', description: 'Her sorunun istatistiksel dökümü (ortalama, std. sapma, vb.)' } },
-            { element: 'header button[onclick="openComparisonModal()"]', popover: { title: '14. Karşılaştırma Modu', description: 'İki grubu radar grafiği ile detaylı kıyaslayın.' } },
-            { element: 'header button[onclick="exportPDF()"]', popover: { title: '15. PDF Rapor', description: 'Tüm analizleri ve detaylı raporu tek bir PDF dosyası olarak indirin.' } },
+            { element: '#btn-open-comp', popover: { title: '14. Karşılaştırma Modu', description: 'İki grubu radar grafiği ile detaylı kıyaslayın.' } },
+            { element: 'header button[onclick="exportPDFNative()"]', popover: { title: '15. PDF Rapor', description: 'Tüm analizleri ve detaylı raporu tek bir PDF dosyası olarak indirin.' } },
             { element: 'header button[onclick="toggleDarkMode()"]', popover: { title: '16. Karanlık Mod', description: 'Göz yormayan karanlık tema ile çalışın.' } }
         ]
     });

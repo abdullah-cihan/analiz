@@ -31,6 +31,10 @@ function calculateCronbachAlpha(data) {
     if (varTotal === 0) return 0;
 
     // 3. Formula
-    const alpha = (k / (k - 1)) * (1 - (sumItemVariances / varTotal));
+    let alpha = (k / (k - 1)) * (1 - (sumItemVariances / varTotal));
+    
+    // Clamp to 0 minimum because negative reliability indicates reversed/random items which is equivalent to 0 reliability for users
+    if (alpha < 0) alpha = 0;
+    
     return alpha;
 }
