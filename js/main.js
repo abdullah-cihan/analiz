@@ -614,12 +614,43 @@ function analyzeAndProcess(json, customMapping = null) {
 function initControls() {
     const groupSelect = document.getElementById('groupSelect');
     groupSelect.innerHTML = '<option value="none">Karşılaştırma Yok (Genel)</option>';
+    
+    const crossGroup1 = document.getElementById('crossGroup1');
+    const crossGroup2 = document.getElementById('crossGroup2');
+    if (crossGroup1) crossGroup1.innerHTML = '<option value="none">Seçiniz</option>';
+    if (crossGroup2) crossGroup2.innerHTML = '<option value="none">Seçiniz</option>';
+
     groupingCandidates.forEach(cand => {
         const opt = document.createElement('option');
         opt.value = cand.key;
         opt.textContent = cand.label;
         groupSelect.appendChild(opt);
+
+        if (crossGroup1) {
+            const opt1 = document.createElement('option');
+            opt1.value = cand.key;
+            opt1.textContent = cand.label;
+            crossGroup1.appendChild(opt1);
+        }
+        if (crossGroup2) {
+            const opt2 = document.createElement('option');
+            opt2.value = cand.key;
+            opt2.textContent = cand.label;
+            crossGroup2.appendChild(opt2);
+        }
     });
+
+    // Populate crossQuestion dropdown
+    const crossQuestion = document.getElementById('crossQuestion');
+    if (crossQuestion) {
+        crossQuestion.innerHTML = '<option value="average">Genel Memnuniyet Ortalaması (Tüm Sorular)</option>';
+        questionList.forEach((q, idx) => {
+            const opt = document.createElement('option');
+            opt.value = `Q${idx + 1}`;
+            opt.textContent = q.length > 60 ? q.substring(0, 60) + '...' : q;
+            crossQuestion.appendChild(opt);
+        });
+    }
 
     const filterContainer = document.getElementById('dynamicFilters');
     filterContainer.innerHTML = '<p class="text-xs text-slate-400 italic" id="no-filter-msg">Henüz filtre eklenmedi.</p>';

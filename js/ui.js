@@ -42,9 +42,19 @@ function initReportSettings() {
 function handleReportTitleChange(val) {
     if (!val || val.trim() === '') {
         val = DEFAULT_TITLE;
+        localStorage.removeItem('custom_report_title');
+    } else {
+        localStorage.setItem('custom_report_title', val);
     }
-    document.getElementById('page-title').textContent = val;
-    localStorage.setItem('custom_report_title', val);
+    
+    const titles = document.querySelectorAll('#page-title');
+    titles.forEach(t => {
+        if (t.tagName === 'H1') {
+            t.innerHTML = `<i class="fa-solid fa-chart-pie text-indigo-500"></i> ${val}`;
+        } else {
+            t.textContent = val;
+        }
+    });
 }
 
 function handleLogoUpload(input) {
@@ -1056,7 +1066,6 @@ function renderHeatmap() {
 }
 
 function renderFeedback() {
-    // ... (Feedback function kept mostly same, but with enhanced HTML for comments) ...
     const columnKey = document.getElementById('feedbackSource').value;
     const container = document.getElementById('comments-list');
     const cloudContainer = document.getElementById('cloud-container');
@@ -1068,13 +1077,30 @@ function renderFeedback() {
     const comments = [];
     let posCount = 0;
     let negCount = 0;
+    let allDetectedTopics = new Set();
 
-    // Stop words from user's snippet
-    const stopWords = ['ve', 'ile', 'bir', 'bu', 'da', 'de', 'için', 'çok', 'daha', 'en', 'ise', 'ama', 'fakat', 'ancak', 'gibi', 'kadar', 'olan', 'olarak', 'var', 'yok', 'veya', 'mu', 'mı', 'ben', 'sen', 'o', 'biz', 'siz', 'onlar', 'her', 'şey', 'ki', 'yok', 'hayır', 'teşekkürler', 'teşekkür', 'yoktur', 'memnunum', 'gayet', 'iyi', 'güzel', 'ilgili', 'hakkında', 'konusunda', 'tarafından', 'dair', 'üzere', 'dolayı', 'rağmen'];
     const words = {};
+    const searchVal = document.getElementById('commentSearch') ? document.getElementById('commentSearch').value.toLocaleLowerCase('tr-TR') : "";
 
-    const searchVal = document.getElementById('commentSearch') ? document.getElementById('commentSearch').value.toLowerCase() : "";
+    // --- PASS 1: Metinleri Topla ve Dinamik Konuları Belirle ---
+    const allTexts = [];
+    data.forEach(row => {
+        const val = row[columnKey];
+        if (val === undefined || val === null) return;
+        const text = String(val).trim();
 
+        if (text.replace(/[.,\-_!?]/g, '').trim().length === 0) return;
+        if (text.length < 3) return;
+        const lowerText = text.toLowerCase();
+        if (['yok', 'hayır', 'yoktur', 'boş'].includes(lowerText)) return;
+        
+        allTexts.push(text);
+    });
+
+    // Dinamik konuları NLP algoritması ile belirle
+    window.currentDynamicTopics = extractDynamicTopics(allTexts);
+
+    // --- PASS 2: Yorumları Etiketle ve Görüntüle ---
     data.forEach(row => {
         const val = row[columnKey];
         if (val === undefined || val === null) return;
@@ -1085,9 +1111,8 @@ function renderFeedback() {
         const lowerText = text.toLowerCase();
         if (['yok', 'hayır', 'yoktur', 'boş'].includes(lowerText)) return;
 
-        // --- Hybrid Analysis (Text + Data) ---
-        // 1. Text Analysis (using our improved sentiment.js)
-        const sentResult = analyzeSentiment(text);
+        // 1. Text Analysis (Dinamik konularla birlikte)
+        const sentResult = analyzeSentiment(text, window.currentDynamicTopics);
         let score = sentResult.score;
 
         // 2. Data Score Check (Fallback if text is neutral)
@@ -1109,17 +1134,29 @@ function renderFeedback() {
         if (score < 0) negCount++;
 
         // Filter and Collect for List
-        if (searchVal === "" || lowerText.includes(searchVal)) {
+        let matchesSearch = (searchVal === "" || lowerText.includes(searchVal));
+        let matchesTopic = (!window.activeTopicFilter || (sentResult.topics && sentResult.topics.includes(window.activeTopicFilter)));
+
+        if (matchesSearch && matchesTopic) {
             let indicator = score > 0
-                ? '<span class="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full ml-auto">Olumlu</span>'
+                ? '<span class="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full ml-auto">Genel: Olumlu</span>'
                 : (score < 0
-                    ? '<span class="text-[10px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full ml-auto">Olumsuz</span>'
+                    ? '<span class="text-[10px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full ml-auto">Genel: Olumsuz</span>'
                     : '');
 
-            comments.push({ text: text, indicator: indicator });
+            comments.push({ 
+                text: text, 
+                indicator: indicator, 
+                topics: sentResult.topics || [],
+                aspectScores: sentResult.aspectScores || {}
+            });
+            
+            if (sentResult.topics) {
+                sentResult.topics.forEach(t => allDetectedTopics.add(t));
+            }
 
-            // Word Cloud Tokenization (User's Logic)
-            const tokens = lowerText.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "").split(/\s+/).filter(t => t.length >= 3 && !stopWords.includes(t));
+            // Word Cloud Tokenization (Global STOP_WORDS kullanarak)
+            const tokens = lowerText.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "").split(/\s+/).filter(t => t.length >= 3 && typeof STOP_WORDS !== 'undefined' && !STOP_WORDS.has(t));
 
             // Unigrams
             tokens.forEach(t => { words[t] = (words[t] || 0) + 1; });
@@ -1139,10 +1176,6 @@ function renderFeedback() {
     if (countEl) countEl.textContent = comments.length;
 
     // 2. Sentiment Bars
-    const total = posCount + negCount; // Only count non-neutral for the bar shares usually, or total comments? User code used totalComments.
-    // User code: const totalSent = posCount + negCount; if(totalSent > 0) ...
-    // Let's stick to User's visual logic: share of *sentiment-expressing* people? 
-    // Actually user code: totalSent = posCount + negCount.
     const totalSent = posCount + negCount;
     if (totalSent > 0) {
         animateValue(document.getElementById('sent-pos-val'), 0, posCount, 1000);
@@ -1168,18 +1201,57 @@ function renderFeedback() {
                 displayText = displayText.replace(regex, '<span class="bg-yellow-200 text-yellow-900 px-1 rounded">$1</span>');
             }
 
+            let topicTags = '';
+            if (c.topics && c.topics.length > 0) {
+                topicTags = '<div class="mt-2 flex flex-wrap gap-1">';
+                c.topics.forEach(t => {
+                    let score = c.aspectScores[t] || 0;
+                    let colorClass = 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'; // Nötr / Sadece Eşleşme
+                    let icon = '';
+                    
+                    if (score > 0) {
+                        colorClass = 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100';
+                        icon = '<i class="fa-solid fa-arrow-up text-[8px] mr-0.5"></i>';
+                    } else if (score < 0) {
+                        colorClass = 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100';
+                        icon = '<i class="fa-solid fa-arrow-down text-[8px] mr-0.5"></i>';
+                    }
+
+                    topicTags += `<span class="text-[9px] font-medium border px-1.5 py-0.5 rounded cursor-pointer transition-colors ${colorClass}" onclick="window.activeTopicFilter = (window.activeTopicFilter === '${t}') ? null : '${t}'; typeof renderFeedback === 'function' ? renderFeedback() : null;">${icon}${t}</span>`;
+                });
+                topicTags += '</div>';
+            }
+
             htmlList += `
-                <div class="p-3 bg-white border border-slate-100 rounded-xl shadow-sm hover:shadow-md transition flex flex-col gap-2 group">
-                    <div class="flex items-start justify-between">
-                         <p class="text-sm text-slate-700 leading-relaxed font-medium">"${displayText}"</p>
-                         ${c.indicator}
+                <div class="p-3 bg-white dark:bg-slate-800 rounded shadow-sm border border-slate-100 dark:border-slate-700 hover:border-blue-200 dark:hover:border-blue-900 transition-colors">
+                    <div class="flex justify-between items-start mb-1">
+                        <i class="fa-solid fa-quote-left text-slate-300 dark:text-slate-600 text-sm mt-0.5"></i>
+                        ${c.indicator}
                     </div>
-                </div>`;
+                    <p class="text-xs text-slate-600 dark:text-slate-300 ml-5 leading-relaxed">${displayText}</p>
+                    <div class="ml-5">${topicTags}</div>
+                </div>
+            `;
         });
         htmlList += '</div>';
         container.innerHTML = htmlList;
     }
 
+    // 4. Update Topic Filters UI
+    const filterContainer = document.getElementById('topic-filters');
+    if (filterContainer) {
+        let filterHtml = `<button onclick="window.activeTopicFilter=null; typeof renderFeedback === 'function' ? renderFeedback() : null;" class="px-2 py-1 rounded-full border ${!window.activeTopicFilter ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'} transition-colors text-[10px]">Tümü</button>`;
+        
+        const topicsToRender = window.currentDynamicTopics || [];
+        topicsToRender.forEach(t => {
+            const isActive = window.activeTopicFilter === t;
+            filterHtml += `<button onclick="window.activeTopicFilter='${t}'; typeof renderFeedback === 'function' ? renderFeedback() : null;" class="px-2 py-1 rounded-full border ${isActive ? 'bg-blue-600 text-white border-blue-600' : 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'} transition-colors text-[10px]">${t}</button>`;
+        });
+        
+        filterContainer.innerHTML = filterHtml;
+    }
+
+    // 5. Word Cloud
     const sortedWords = Object.entries(words).sort((a, b) => b[1] - a[1]).slice(0, 40);
     if (sortedWords.length === 0) {
         cloudContainer.innerHTML = '<p class="text-slate-400 w-full text-center mt-4">Analiz edilecek kelime bulunamadı.</p>';
@@ -1989,4 +2061,142 @@ function startTour() {
     });
 
     tour.drive();
+    tour.drive();
+}
+
+// --- FEATURE: Cross Tabulation ---
+function renderCrossTab() {
+    const group1Key = document.getElementById('crossGroup1')?.value;
+    const group2Key = document.getElementById('crossGroup2')?.value;
+    const questionKey = document.getElementById('crossQuestion')?.value;
+    const container = document.getElementById('crosstab-container');
+
+    if (!container) return;
+
+    if (!group1Key || group1Key === 'none' || !group2Key || group2Key === 'none' || !questionKey) {
+        container.innerHTML = '<div class="flex items-center justify-center h-full text-slate-400 text-sm py-12">Lütfen yukarıdan analiz edilecek X Ekseni, Y Ekseni ve Soruyu seçin.</div>';
+        return;
+    }
+
+    if (group1Key === group2Key) {
+        container.innerHTML = '<div class="flex items-center justify-center h-full text-red-500 text-sm py-12"><i class="fa-solid fa-triangle-exclamation mr-2"></i> X Ekseni ve Y Ekseni için farklı gruplar seçmelisiniz.</div>';
+        return;
+    }
+
+    const rawData = getFilteredData();
+    if (!rawData || rawData.length === 0) {
+        container.innerHTML = '<div class="flex items-center justify-center h-full text-slate-400 text-sm py-12">Analiz edilecek veri bulunamadı.</div>';
+        return;
+    }
+
+    // Determine unique values for both groups
+    const g1Values = [...new Set(rawData.map(row => row[group1Key]).filter(val => val !== undefined && val !== null && val !== ''))].sort();
+    const g2Values = [...new Set(rawData.map(row => row[group2Key]).filter(val => val !== undefined && val !== null && val !== ''))].sort();
+
+    // Create Matrix
+    let html = '<table class="w-full text-sm text-center border-collapse bg-white dark:bg-slate-800 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700">';
+    
+    // Header Row (Group 1 values)
+    html += '<thead class="bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-300">';
+    html += '<tr><th class="border border-slate-200 dark:border-slate-700 p-3 bg-slate-100 dark:bg-slate-950 font-bold">Y Ekseni \\ X Ekseni</th>';
+    g1Values.forEach(g1 => {
+        html += `<th class="border border-slate-200 dark:border-slate-700 p-3 font-semibold">${g1}</th>`;
+    });
+    html += '<th class="border border-slate-200 dark:border-slate-700 p-3 font-bold bg-slate-100 dark:bg-slate-950">Genel (Satır)</th></tr></thead><tbody>';
+
+    let allScores = [];
+
+    // Rows (Group 2 values)
+    g2Values.forEach(g2 => {
+        html += `<tr><td class="border border-slate-200 dark:border-slate-700 p-3 font-semibold bg-slate-50 dark:bg-slate-900 text-left text-slate-700 dark:text-slate-300">${g2}</td>`;
+        
+        let rowSum = 0;
+        let rowCount = 0;
+
+        g1Values.forEach(g1 => {
+            // Find intersection
+            const subset = rawData.filter(row => row[group1Key] == g1 && row[group2Key] == g2);
+            let cellScore = null;
+            let cellHtml = '<span class="text-slate-300">-</span>';
+            let cellBg = '';
+
+            if (subset.length > 0) {
+                let sum = 0;
+                let count = 0;
+                
+                subset.forEach(row => {
+                    if (questionKey === 'average') {
+                        questionList.forEach((_, idx) => {
+                            const val = row[`Q${idx + 1}`];
+                            if (val) { sum += val; count++; }
+                        });
+                    } else {
+                        const val = row[questionKey];
+                        if (val) { sum += val; count++; }
+                    }
+                });
+
+                if (count > 0) {
+                    cellScore = sum / count;
+                    rowSum += cellScore * subset.length; // Weighted average for row total
+                    rowCount += subset.length;
+                    allScores.push(cellScore);
+                    
+                    // Simple heatmap coloring
+                    const intensity = (cellScore - 1) / 4; // 0 to 1
+                    cellBg = `background-color: rgba(59, 130, 246, ${intensity * 0.8})`; // Blue scale
+                    
+                    let textColor = cellScore > 3.5 ? 'text-white font-bold' : 'text-slate-700 font-medium';
+                    
+                    cellHtml = `
+                        <div class="flex flex-col items-center justify-center">
+                            <span class="${textColor} text-base">${cellScore.toFixed(2)}</span>
+                            <span class="text-[9px] ${cellScore > 3.5 ? 'text-blue-100' : 'text-slate-400'} mt-0.5">n=${subset.length}</span>
+                        </div>
+                    `;
+                }
+            }
+            
+            html += `<td class="border border-slate-200 dark:border-slate-700 p-2 min-w-[80px]" style="${cellBg}">${cellHtml}</td>`;
+        });
+
+        // Row Average
+        let rowAvgHtml = '<span class="text-slate-300">-</span>';
+        if (rowCount > 0) {
+            const rowAvg = rowSum / rowCount;
+            rowAvgHtml = `<span class="font-bold text-slate-700 dark:text-slate-200">${rowAvg.toFixed(2)}</span>`;
+        }
+        html += `<td class="border border-slate-200 dark:border-slate-700 p-3 bg-slate-50 dark:bg-slate-900">${rowAvgHtml}</td></tr>`;
+    });
+
+    // Column Averages (Bottom Row)
+    html += '<tr class="bg-slate-100 dark:bg-slate-950 text-slate-700 dark:text-slate-300 font-bold"><td class="border border-slate-200 dark:border-slate-700 p-3 text-left">Genel (Sütun)</td>';
+    g1Values.forEach(g1 => {
+        const subset = rawData.filter(row => row[group1Key] == g1);
+        let colSum = 0;
+        let colCount = 0;
+        
+        subset.forEach(row => {
+            if (questionKey === 'average') {
+                questionList.forEach((_, idx) => {
+                    const val = row[`Q${idx + 1}`];
+                    if (val) { colSum += val; colCount++; }
+                });
+            } else {
+                const val = row[questionKey];
+                if (val) { colSum += val; colCount++; }
+            }
+        });
+
+        let colAvgHtml = '<span class="text-slate-400">-</span>';
+        if (colCount > 0) {
+            colAvgHtml = (colSum / colCount).toFixed(2);
+        }
+        html += `<td class="border border-slate-200 dark:border-slate-700 p-3">${colAvgHtml}</td>`;
+    });
+    
+    html += '<td class="border border-slate-200 dark:border-slate-700 p-3 text-slate-400 text-xs">Genel Ort.</td></tr>';
+
+    html += '</tbody></table>';
+    container.innerHTML = html;
 }
