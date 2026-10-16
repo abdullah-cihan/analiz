@@ -121,38 +121,127 @@ function clearLogo() {
 // --- THEME & PALETTES ---
 const PALETTES = {
     light: [
-        { border: '#4f46e5', bg: 'rgba(79, 70, 229, 0.7)' }, // Indigo (Pro)
-        { border: '#0ea5e9', bg: 'rgba(14, 165, 233, 0.7)' }, // Sky
-        { border: '#10b981', bg: 'rgba(16, 185, 129, 0.7)' }, // Emerald
-        { border: '#f59e0b', bg: 'rgba(245, 158, 11, 0.7)' }, // Amber
-        { border: '#ef4444', bg: 'rgba(239, 68, 68, 0.7)' }, // Red
+        { border: '#4f46e5', bg: 'rgba(79, 70, 229, 0.8)' }, // Indigo (Pro)
+        { border: '#0284c7', bg: 'rgba(2, 132, 199, 0.8)' }, // Sky
+        { border: '#059669', bg: 'rgba(5, 150, 105, 0.8)' }, // Emerald
+        { border: '#d97706', bg: 'rgba(217, 119, 6, 0.8)' }, // Amber
+        { border: '#dc2626', bg: 'rgba(220, 38, 38, 0.8)' }, // Red
     ],
     dark: [
-        { border: '#818cf8', bg: 'rgba(129, 140, 248, 0.8)' }, // Bright Indigo
-        { border: '#38bdf8', bg: 'rgba(56, 189, 248, 0.8)' }, // Bright Sky
-        { border: '#34d399', bg: 'rgba(52, 211, 153, 0.8)' }, // Bright Emerald
-        { border: '#fbbf24', bg: 'rgba(251, 191, 36, 0.8)' }, // Bright Amber
-        { border: '#f87171', bg: 'rgba(248, 113, 113, 0.8)' }, // Bright Red
+        { border: '#818cf8', bg: 'rgba(129, 140, 248, 0.85)' }, // Bright Indigo
+        { border: '#38bdf8', bg: 'rgba(56, 189, 248, 0.85)' }, // Bright Sky
+        { border: '#34d399', bg: 'rgba(52, 211, 153, 0.85)' }, // Bright Emerald
+        { border: '#fbbf24', bg: 'rgba(251, 191, 36, 0.85)' }, // Bright Amber
+        { border: '#f87171', bg: 'rgba(248, 113, 113, 0.85)' }, // Bright Red
     ]
 };
 const TRAFFIC_PALETTE = {
-    light: { low: 'rgba(239, 68, 68, 0.7)', mid: 'rgba(245, 158, 11, 0.7)', high: 'rgba(16, 185, 129, 0.7)' },
+    light: { low: 'rgba(220, 38, 38, 0.8)', mid: 'rgba(217, 119, 6, 0.8)', high: 'rgba(5, 150, 105, 0.8)' },
     dark: { low: 'rgba(248, 113, 113, 0.8)', mid: 'rgba(251, 191, 36, 0.8)', high: 'rgba(52, 211, 153, 0.8)' }
 };
 
 
 
-// --- HELPER: Gradient Generator ---
-function createGradient(ctx, color) {
-    const gradient = ctx.createLinearGradient(0, 0, 0, 400);
-    // Robustly replace the last number (alpha) with new opacity
-    // Works for "rgba(r, g, b, a)" format
-    const topColor = color.replace(/[\d\.]+\)$/, '0.9)');
-    const bottomColor = color.replace(/[\d\.]+\)$/, '0.2)');
+// --- HELPER: Theme-aware chart colors (single source of truth) ---
+function isDarkTheme() {
+    return document.documentElement.classList.contains('dark');
+}
 
-    gradient.addColorStop(0, topColor);
-    gradient.addColorStop(1, bottomColor);
-    return gradient;
+function getChartTheme(isDark = isDarkTheme()) {
+    return isDark ? {
+        isDark: true,
+        text: '#cbd5e1',          // Slate 300 - readable on slate 800/900
+        textMuted: '#94a3b8',     // Slate 400
+        grid: 'rgba(148, 163, 184, 0.18)',
+        axis: 'rgba(148, 163, 184, 0.35)',
+        datalabel: '#f1f5f9',
+        surface: '#1e293b',       // Card background (borders/backdrops)
+        tooltipBg: 'rgba(15, 23, 42, 0.95)',
+        tooltipTitle: '#f8fafc',
+        tooltipBody: '#cbd5e1',
+        tooltipBorder: '#475569',
+        accent: '#60a5fa',
+        accentStrong: '#93c5fd',
+        purple: '#c084fc',
+        gradientTop: 1,
+        gradientBottom: 0.6
+    } : {
+        isDark: false,
+        text: '#475569',          // Slate 600 - readable on white
+        textMuted: '#64748b',     // Slate 500
+        grid: '#e2e8f0',
+        axis: '#cbd5e1',
+        datalabel: '#334155',
+        surface: '#ffffff',
+        tooltipBg: 'rgba(255, 255, 255, 0.97)',
+        tooltipTitle: '#0f172a',
+        tooltipBody: '#475569',
+        tooltipBorder: '#cbd5e1',
+        accent: '#2563eb',
+        accentStrong: '#1e40af',
+        purple: '#7c3aed',
+        gradientTop: 0.95,
+        gradientBottom: 0.55
+    };
+}
+
+// Shared tooltip styling for all charts
+function getTooltipTheme(theme = getChartTheme()) {
+    return {
+        backgroundColor: theme.tooltipBg,
+        titleColor: theme.tooltipTitle,
+        bodyColor: theme.tooltipBody,
+        borderColor: theme.tooltipBorder,
+        borderWidth: 1
+    };
+}
+
+// Apply global Chart.js defaults according to the current theme
+function applyChartThemeDefaults() {
+    if (typeof Chart === 'undefined') return;
+    const theme = getChartTheme();
+    Chart.defaults.color = theme.text;
+    Chart.defaults.borderColor = theme.grid;
+}
+
+// --- HELPER: Color -> rgba(r,g,b,alpha) (supports #rgb, #rrggbb, rgb(), rgba()) ---
+function toRgba(color, alpha) {
+    if (typeof color !== 'string') return color;
+    const c = color.trim();
+    if (c.startsWith('#')) {
+        let hex = c.slice(1);
+        if (hex.length === 3) hex = hex.split('').map(ch => ch + ch).join('');
+        const num = parseInt(hex.substring(0, 6), 16);
+        if (isNaN(num)) return color;
+        return `rgba(${(num >> 16) & 255}, ${(num >> 8) & 255}, ${num & 255}, ${alpha})`;
+    }
+    const m = c.match(/rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/i);
+    if (m) return `rgba(${m[1]}, ${m[2]}, ${m[3]}, ${alpha})`;
+    return color;
+}
+
+// --- HELPER: Gradient Generator ---
+// Returns a scriptable color: the gradient is computed from the real chart area,
+// so tall (horizontal) charts no longer fade to near-transparent below 400px.
+// options.horizontal = true -> gradient runs left to right (for indexAxis: 'y').
+function createGradient(ctx, color, options = {}) {
+    const horizontal = !!options.horizontal;
+    return (context) => {
+        const theme = getChartTheme();
+        const chart = context && context.chart;
+        const solid = toRgba(color, theme.gradientTop);
+        if (!chart || !chart.chartArea) return solid;
+
+        const { chartArea } = chart;
+        const c2d = chart.ctx || ctx;
+        const gradient = horizontal
+            ? c2d.createLinearGradient(chartArea.left, 0, chartArea.right, 0)
+            : c2d.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+
+        gradient.addColorStop(0, toRgba(color, theme.gradientBottom));
+        gradient.addColorStop(1, solid);
+        return gradient;
+    };
 }
 
 // --- HELPER: Count Up Animation ---
@@ -195,6 +284,7 @@ function switchTab(tabId) {
     if (tabId === 'feedback') renderFeedback();
     if (tabId === 'editor') renderEditor();
     if (tabId === 'report') generateDetailedReport();
+    if (tabId === 'crosstab' && typeof renderCrossTab === 'function') renderCrossTab();
 }
 
 function setChartType(type) {
@@ -278,9 +368,12 @@ function renderMainChart(stats, rawData = [], groupKey = 'none') {
     // --- Dataset Generation Logic ---
     const isDark = document.documentElement.classList.contains('dark');
     // Define Chart Colors based on theme
-    const gridColor = isDark ? '#334155' : '#f1f5f9';
-    const textColor = isDark ? '#94a3b8' : '#64748b';
-    const axisColor = isDark ? '#475569' : '#e2e8f0';
+    const theme = getChartTheme(isDark);
+    const gridColor = theme.grid;
+    const textColor = theme.text;
+    const axisColor = theme.axis;
+    const isHorizontal = currentChartType === 'horizontalBar';
+    const isBarLike = currentChartType === 'bar' || isHorizontal;
 
     // Fallback if constants are missing (safe guard)
     const activePalette = (typeof PALETTES !== 'undefined' && isDark) ? PALETTES.dark : (typeof PALETTES !== 'undefined' ? PALETTES.light : PALETTE);
@@ -313,12 +406,17 @@ function renderMainChart(stats, rawData = [], groupKey = 'none') {
             // Pick color from Palette
             const colorObj = activePalette[i % activePalette.length];
 
+            // Overlapping fills (area / radar) need lower opacity so every group stays visible
+            const overlapFill = currentChartType === 'area' || currentChartType === 'radar';
+
             datasets.push({
                 label: gName.length > 20 ? gName.substring(0, 20) + '...' : gName,
                 data: avgs,
-                backgroundColor: colorObj.bg,
+                backgroundColor: overlapFill ? toRgba(colorObj.border, isDark ? 0.25 : 0.18) : colorObj.bg,
                 borderColor: colorObj.border,
-                borderWidth: 1,
+                pointBackgroundColor: colorObj.border,
+                pointBorderColor: theme.surface,
+                borderWidth: isBarLike ? 1 : 2,
                 borderRadius: 4,
                 fill: currentChartType === 'area',
                 tension: 0.4,
@@ -339,30 +437,40 @@ function renderMainChart(stats, rawData = [], groupKey = 'none') {
         labels.push('GENEL ORT.');
         data.push(grandAvg);
 
-        const bgColors = data.map((v, i) => {
-            // Distinct color for General Average (Purple)
-            if (i === data.length - 1) return createGradient(ctx, isDark ? '#c084fc' : '#8b5cf6');
-
-            let color;
-            if (v < 2.5) color = trafficColors.low;
-            else if (v < 3.5) color = trafficColors.mid;
-            else color = trafficColors.high;
-            return createGradient(ctx, color);
+        // Base color per bar (traffic light + distinct purple for General Average)
+        const baseColors = data.map((v, i) => {
+            if (i === data.length - 1) return theme.purple;
+            if (v < 2.5) return trafficColors.low;
+            if (v < 3.5) return trafficColors.mid;
+            return trafficColors.high;
         });
 
-        const borderColors = data.map((v, i) => {
-            if (i === data.length - 1) return isDark ? '#c084fc' : '#8b5cf6';
+        // Gradients follow bar orientation and the real chart area
+        const gradientFns = baseColors.map(c => createGradient(ctx, c, { horizontal: isHorizontal }));
+        const borderColors = baseColors.map(c => toRgba(c, 1));
 
-            if (v < 2.5) return trafficColors.low.replace('0.7', '1').replace('0.8', '1');
-            if (v < 3.5) return trafficColors.mid.replace('0.7', '1').replace('0.8', '1');
-            return trafficColors.high.replace('0.7', '1').replace('0.8', '1');
-        });
+        // Single scriptable color (Chart.js doesn't resolve functions inside option arrays)
+        const bgColors = (context) => {
+            const i = context.dataIndex;
+            if (typeof i !== 'number' || !baseColors[i]) {
+                // Dataset-level (line/area fill)
+                return toRgba(theme.accent, isDark ? 0.2 : 0.12);
+            }
+            if (isBarLike) return gradientFns[i](context);
+            return toRgba(baseColors[i], 0.9);
+        };
+        const borderColorFn = (context) => {
+            const i = context.dataIndex;
+            if (typeof i !== 'number' || !borderColors[i]) return theme.accent; // line stroke
+            return borderColors[i];
+        };
 
         datasets.push({
             label: 'Genel Ortalama',
             data: data,
             backgroundColor: bgColors,
-            borderColor: borderColors,
+            borderColor: borderColorFn,
+            pointBorderColor: theme.surface,
             borderWidth: 2,
             borderRadius: 8,
             fill: currentChartType === 'area',
@@ -444,14 +552,10 @@ function renderMainChart(stats, rawData = [], groupKey = 'none') {
                     display: groupKey !== 'none', // Show legend only if grouped
                     position: 'top',
                     align: 'end',
-                    labels: { boxWidth: 10, usePointStyle: true, font: { size: 11 } }
+                    labels: { boxWidth: 10, usePointStyle: true, font: { size: 11 }, color: textColor }
                 },
                 tooltip: {
-                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                    titleColor: '#1e293b',
-                    bodyColor: '#475569',
-                    borderColor: '#e2e8f0',
-                    borderWidth: 1,
+                    ...getTooltipTheme(theme),
                     padding: 12,
                     boxPadding: 4,
                     usePointStyle: true,
@@ -470,7 +574,7 @@ function renderMainChart(stats, rawData = [], groupKey = 'none') {
                     align: 'top',
                     formatter: (value) => value.toFixed(2),
                     font: { weight: 'bold', size: 10 },
-                    color: '#64748b',
+                    color: theme.datalabel,
                     offset: 2,
                     display: (ctx) => {
                         return window.showChartLabels;
@@ -482,14 +586,14 @@ function renderMainChart(stats, rawData = [], groupKey = 'none') {
                             type: 'line',
                             // Only valid for Cartesian
                             yMin: targetScore, yMax: targetScore,
-                            borderColor: 'rgba(239, 68, 68, 0.6)',
+                            borderColor: isDark ? 'rgba(248, 113, 113, 0.85)' : 'rgba(220, 38, 38, 0.7)',
                             borderWidth: 2,
                             borderDash: [5, 5],
                             label: {
                                 content: `Hedef: ${targetScore}`,
                                 enabled: true,
                                 position: 'start',
-                                backgroundColor: 'rgba(239, 68, 68, 0.8)',
+                                backgroundColor: isDark ? 'rgba(239, 68, 68, 0.9)' : 'rgba(220, 38, 38, 0.9)',
                                 color: 'white',
                                 font: { size: 10 }
                             }
@@ -537,8 +641,8 @@ function renderMainChart(stats, rawData = [], groupKey = 'none') {
         // but if NOT grouped, we need the "transparent fill" style
         if (groupKey === 'none') {
             if (isRadar) {
-                chartConfig.data.datasets[0].backgroundColor = 'rgba(59, 130, 246, 0.2)';
-                chartConfig.data.datasets[0].pointBackgroundColor = '#3b82f6';
+                chartConfig.data.datasets[0].backgroundColor = toRgba(theme.accent, isDark ? 0.25 : 0.18);
+                chartConfig.data.datasets[0].pointBackgroundColor = theme.accent;
             }
         }
     }
@@ -551,8 +655,9 @@ function renderDistributionChart(data, groupKey) {
     if (charts.dist) charts.dist.destroy();
 
     const isDark = document.documentElement.classList.contains('dark');
-    const textColor = isDark ? '#94a3b8' : '#475569';
-    const borderColor = isDark ? '#1e293b' : '#ffffff';
+    const theme = getChartTheme(isDark);
+    const textColor = theme.text;
+    const borderColor = theme.surface;
 
     let labels = [], counts = [];
 
@@ -569,8 +674,9 @@ function renderDistributionChart(data, groupKey) {
         counts = Object.values(groups);
     }
 
-    // Generate colors cycling through Palette
-    const bgColors = labels.map((_, i) => PALETTE[i % PALETTE.length].border);
+    // Generate colors cycling through Palette (brighter tones in dark mode)
+    const distPalette = (isDark && typeof PALETTE_DARK !== 'undefined') ? PALETTE_DARK : PALETTE;
+    const bgColors = labels.map((_, i) => distPalette[i % distPalette.length].border);
 
     charts.dist = new Chart(ctx, {
         type: 'doughnut',
@@ -627,11 +733,7 @@ function renderDistributionChart(data, groupKey) {
                     }
                 },
                 tooltip: {
-                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                    titleColor: '#1e293b',
-                    bodyColor: '#475569',
-                    borderColor: '#e2e8f0',
-                    borderWidth: 1,
+                    ...getTooltipTheme(theme),
                     padding: 12,
                     callbacks: {
                         label: (ctx) => {
@@ -642,7 +744,7 @@ function renderDistributionChart(data, groupKey) {
                     }
                 },
                 datalabels: {
-                    color: '#fff',
+                    color: isDark ? '#0f172a' : '#ffffff',
                     font: { weight: 'bold', size: 11 },
                     backgroundColor: (ctx) => ctx.dataset.backgroundColor[ctx.dataIndex],
                     borderRadius: 4,
@@ -701,11 +803,13 @@ function renderMultiSelectAnalysis() {
     if (charts.multiSelect) charts.multiSelect.destroy();
 
     const isDark = document.documentElement.classList.contains('dark');
-    const gridColor = isDark ? '#334155' : '#f1f5f9';
-    const textColor = isDark ? '#94a3b8' : '#64748b';
-    const tooltipBg = isDark ? '#1e293b' : 'white';
-    const tooltipText = isDark ? '#f1f5f9' : '#1e293b';
-    const tooltipBorder = isDark ? '#334155' : '#e2e8f0';
+    const theme = getChartTheme(isDark);
+    const gridColor = theme.grid;
+    const textColor = theme.text;
+    const tooltipBg = theme.tooltipBg;
+    const tooltipText = theme.tooltipTitle;
+    const tooltipBorder = theme.tooltipBorder;
+    const barColor = isDark ? '#60a5fa' : '#2563eb';
 
     charts.multiSelect = new Chart(ctx, {
         type: 'bar',
@@ -715,8 +819,8 @@ function renderMultiSelectAnalysis() {
             datasets: [{
                 label: 'Seçilme Sayısı',
                 data: values,
-                backgroundColor: createGradient(ctx, 'rgba(59, 130, 246, 0.8)'),
-                borderColor: '#3b82f6',
+                backgroundColor: createGradient(ctx, barColor, { horizontal: true }),
+                borderColor: barColor,
                 borderWidth: 1,
                 borderRadius: 4
             }]
@@ -735,7 +839,7 @@ function renderMultiSelectAnalysis() {
                 tooltip: {
                     backgroundColor: tooltipBg,
                     titleColor: tooltipText,
-                    bodyColor: isDark ? '#cbd5e1' : '#475569',
+                    bodyColor: theme.tooltipBody,
                     borderColor: tooltipBorder,
                     borderWidth: 1
                 },
@@ -744,7 +848,7 @@ function renderMultiSelectAnalysis() {
                     align: 'end',
                     formatter: (val) => val,
                     font: { weight: 'bold' },
-                    color: textColor,
+                    color: theme.datalabel,
                     offset: 4
                 }
             }
@@ -974,20 +1078,20 @@ function renderHeatmap() {
             const delta = avg > 0 ? avg - overallAvg : 0;
             const deltaStr = delta > 0 ? `+${delta.toFixed(2)}` : delta.toFixed(2);
 
-            // Relative delta color logic
-            let bgClass = 'bg-slate-100 text-slate-400 border border-slate-200';
+            // Relative delta color logic (tuned for both light and dark themes)
+            let bgClass = 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700';
             if (avg > 0) {
-                if (delta >= 0.20) bgClass = 'bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-sm';
-                else if (delta > 0.05) bgClass = 'bg-green-50 text-green-700 border border-green-200';
-                else if (delta >= -0.05) bgClass = 'bg-slate-50 text-slate-600 border border-slate-200';
-                else if (delta > -0.20) bgClass = 'bg-orange-100 text-orange-800 border border-orange-200';
-                else bgClass = 'bg-red-100 text-red-800 border border-red-300';
+                if (delta >= 0.20) bgClass = 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700/60 shadow-sm';
+                else if (delta > 0.05) bgClass = 'bg-green-50 dark:bg-emerald-950/30 text-green-700 dark:text-emerald-400 border border-green-200 dark:border-emerald-800/40';
+                else if (delta >= -0.05) bgClass = 'bg-slate-50 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700';
+                else if (delta > -0.20) bgClass = 'bg-orange-100 dark:bg-amber-950/50 text-orange-800 dark:text-amber-300 border border-orange-200 dark:border-amber-800/50';
+                else bgClass = 'bg-red-100 dark:bg-red-950/60 text-red-800 dark:text-red-300 border border-red-300 dark:border-red-700/60';
             }
 
             const isMax = (avg === maxAvg && avg > 0 && validAvgs.length > 1);
             const trophyHtml = isMax ? `<span class="absolute -top-2 -right-2 drop-shadow-md text-base" title="Bu sorudaki en yüksek değer">🏆</span>` : '';
             
-            const deltaColor = delta > 0.05 ? 'text-emerald-600' : (delta < -0.05 ? 'text-red-500' : 'text-slate-400');
+            const deltaColor = delta > 0.05 ? 'text-emerald-600 dark:text-emerald-400' : (delta < -0.05 ? 'text-red-500 dark:text-red-400' : 'text-slate-400 dark:text-slate-500');
             const deltaHtml = avg > 0 ? `<span class="text-[10px] font-bold ${deltaColor} mt-1 tracking-tighter">${deltaStr}</span>` : '';
 
             html += `<td class="p-2 text-center align-middle" onclick="openModalById(${qId})">
@@ -995,7 +1099,7 @@ function renderHeatmap() {
                     ${trophyHtml}
                     <span class="text-sm font-bold ${avg === 0 ? 'opacity-50' : ''}">${avg.toFixed(2)}</span>
                     ${deltaHtml}
-                    <span class="text-[9px] text-slate-500 font-medium mt-0.5">n:${gInfo.count}</span>
+                    <span class="text-[9px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">n:${gInfo.count}</span>
                 </div>
             </td>`;
         });
@@ -1272,6 +1376,12 @@ function renderWordCloudChart(sortedWords) {
     const labels = sortedWords.map(w => w[0]);
     const data = sortedWords.map(w => w[1] * 10); // scale up for wordcloud
 
+    const theme = getChartTheme();
+    // High-contrast blue/indigo tones per theme (no pale tones on white, no navy on slate)
+    const cloudColors = theme.isDark
+        ? ['#93c5fd', '#60a5fa', '#a5b4fc', '#7dd3fc', '#bfdbfe', '#c4b5fd']
+        : ['#1d4ed8', '#2563eb', '#1e40af', '#4338ca', '#0369a1', '#3730a3'];
+
     charts['wordCloud'] = new Chart(ctx, {
         type: 'wordCloud',
         data: {
@@ -1280,8 +1390,9 @@ function renderWordCloudChart(sortedWords) {
                 label: 'Kelime Frekansı',
                 data: data,
                 color: function(context) {
-                    const colors = ['#2563eb', '#3b82f6', '#60a5fa', '#93c5fd', '#1e40af'];
-                    return colors[Math.floor(Math.random() * colors.length)];
+                    // Stable per-word color (avoids flicker on hover/redraw)
+                    const idx = typeof context.dataIndex === 'number' ? context.dataIndex : 0;
+                    return cloudColors[idx % cloudColors.length];
                 }
             }]
         },
@@ -1289,6 +1400,7 @@ function renderWordCloudChart(sortedWords) {
             plugins: {
                 legend: { display: false },
                 tooltip: {
+                    ...getTooltipTheme(theme),
                     callbacks: {
                         label: (ctx) => `Geçiş sayısı: ${ctx.raw / 10}`
                     }
@@ -1367,6 +1479,8 @@ function renderTimeSeriesChart(data) {
         charts['timeSeries'].destroy();
     }
 
+    const theme = getChartTheme();
+
     charts['timeSeries'] = new Chart(ctx, {
         type: 'line',
         data: {
@@ -1374,10 +1488,11 @@ function renderTimeSeriesChart(data) {
             datasets: [{
                 label: 'Ortalama Memnuniyet',
                 data: dataPoints,
-                borderColor: '#3b82f6',
-                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                borderColor: theme.accent,
+                backgroundColor: toRgba(theme.accent, theme.isDark ? 0.18 : 0.12),
                 borderWidth: 2,
-                pointBackgroundColor: '#2563eb',
+                pointBackgroundColor: theme.accent,
+                pointBorderColor: theme.surface,
                 pointRadius: 4,
                 fill: true,
                 tension: 0.3
@@ -1387,15 +1502,17 @@ function renderTimeSeriesChart(data) {
             responsive: true,
             maintainAspectRatio: false,
             scales: {
-                y: { min: 1, max: 5 }
+                y: { min: 1, max: 5, grid: { color: theme.grid }, ticks: { color: theme.text } },
+                x: { grid: { color: theme.grid }, ticks: { color: theme.text } }
             },
             plugins: {
                 legend: { display: false },
+                tooltip: { ...getTooltipTheme(theme) },
                 datalabels: {
                     align: 'top',
                     anchor: 'end',
                     offset: 4,
-                    color: '#1e40af',
+                    color: theme.accentStrong,
                     font: { weight: 'bold', size: 10 },
                     display: (ctx) => window.showChartLabels
                 }
@@ -1451,6 +1568,8 @@ function openModal(item) {
     });
 
     const ctx = document.getElementById('modalChart').getContext('2d');
+    const theme = getChartTheme();
+    const histAlpha = theme.isDark ? 0.85 : 0.8;
     charts.modal = new Chart(ctx, {
         type: 'bar',
         data: {
@@ -1458,12 +1577,18 @@ function openModal(item) {
             datasets: [{
                 label: 'Yanıt Sayısı',
                 data: counts,
-                backgroundColor: [
-                    'rgba(239, 68, 68, 0.6)',
-                    'rgba(249, 115, 22, 0.6)',
-                    'rgba(234, 179, 8, 0.6)',
-                    'rgba(132, 204, 22, 0.6)',
-                    'rgba(16, 185, 129, 0.6)'
+                backgroundColor: theme.isDark ? [
+                    `rgba(248, 113, 113, ${histAlpha})`,
+                    `rgba(251, 146, 60, ${histAlpha})`,
+                    `rgba(250, 204, 21, ${histAlpha})`,
+                    `rgba(163, 230, 53, ${histAlpha})`,
+                    `rgba(52, 211, 153, ${histAlpha})`
+                ] : [
+                    `rgba(220, 38, 38, ${histAlpha})`,
+                    `rgba(234, 88, 12, ${histAlpha})`,
+                    `rgba(202, 138, 4, ${histAlpha})`,
+                    `rgba(101, 163, 13, ${histAlpha})`,
+                    `rgba(5, 150, 105, ${histAlpha})`
                 ],
                 borderRadius: 4,
                 borderWidth: 0
@@ -1472,10 +1597,20 @@ function openModal(item) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
+            plugins: {
+                legend: { display: false },
+                tooltip: { ...getTooltipTheme(theme) },
+                datalabels: {
+                    // Contrast ink on bars; zero-count labels (no bar behind) use normal text color
+                    color: (c) => (c.dataset.data[c.dataIndex] > 0)
+                        ? (theme.isDark ? '#0f172a' : '#ffffff')
+                        : theme.text,
+                    font: { weight: 'bold', size: 11 }
+                }
+            },
             scales: {
-                y: { beginAtZero: true, grid: { display: false } },
-                x: { grid: { display: false } }
+                y: { beginAtZero: true, grid: { display: false }, ticks: { color: theme.text } },
+                x: { grid: { display: false }, ticks: { color: theme.text } }
             }
         }
     });
@@ -1628,6 +1763,11 @@ function renderComparison() {
     const ctx = document.getElementById('compChart').getContext('2d');
     if (charts.comp) charts.comp.destroy();
 
+    const isDark = isDarkTheme();
+    const theme = getChartTheme(isDark);
+    const colorA = isDark ? '#818cf8' : '#4f46e5';
+    const colorB = isDark ? '#fb923c' : '#ea580c';
+
     charts.comp = new Chart(ctx, {
         type: 'radar',
         data: {
@@ -1636,17 +1776,21 @@ function renderComparison() {
                 {
                     label: groupA,
                     data: avgsA,
-                    borderColor: '#6366f1',
-                    backgroundColor: 'rgba(99, 102, 241, 0.2)',
+                    borderColor: colorA,
+                    backgroundColor: toRgba(colorA, isDark ? 0.25 : 0.18),
                     pointRadius: 4,
+                    pointBackgroundColor: colorA,
+                    pointBorderColor: theme.surface,
                     borderWidth: 2
                 },
                 {
                     label: groupB,
                     data: avgsB,
-                    borderColor: '#f97316',
-                    backgroundColor: 'rgba(249, 115, 22, 0.2)',
+                    borderColor: colorB,
+                    backgroundColor: toRgba(colorB, isDark ? 0.25 : 0.18),
                     pointRadius: 4,
+                    pointBackgroundColor: colorB,
+                    pointBorderColor: theme.surface,
                     borderWidth: 2
                 }
             ]
@@ -1655,10 +1799,27 @@ function renderComparison() {
             responsive: true,
             maintainAspectRatio: false,
             scales: {
-                r: { min: 1, max: 5, grid: { color: '#f1f5f9' }, pointLabels: { font: { size: 10 } } }
+                r: {
+                    min: 1,
+                    max: 5,
+                    grid: { color: theme.grid },
+                    angleLines: { color: theme.axis },
+                    pointLabels: {
+                        font: { size: 10, family: 'Inter' },
+                        color: theme.text
+                    },
+                    ticks: {
+                        display: false,
+                        backdropColor: theme.surface
+                    }
+                }
             },
             plugins: {
-                legend: { position: 'bottom' }
+                legend: {
+                    position: 'bottom',
+                    labels: { color: theme.text, font: { size: 11 } }
+                },
+                tooltip: { ...getTooltipTheme(theme) }
             }
         }
     });
@@ -1700,28 +1861,39 @@ function toggleDarkMode() {
     const isDark = html.classList.toggle('dark');
     localStorage.setItem('theme', isDark ? 'dark' : 'light');
 
-    // Update Chart Defaults
-    if (isDark) {
-        Chart.defaults.color = '#94a3b8';
-        Chart.defaults.borderColor = '#334155';
-    } else {
-        Chart.defaults.color = '#64748b';
-        Chart.defaults.borderColor = '#e2e8f0';
+    // Update Chart Defaults centrally
+    if (typeof applyChartThemeDefaults === 'function') {
+        applyChartThemeDefaults();
     }
 
     // Trigger full dashboard update to regenerate datasets with new palette
     if (typeof updateDashboard === 'function' && typeof questionList !== 'undefined' && questionList.length > 0) {
         updateDashboard();
     }
+
+    // Re-render WordCloud if feedback tab is active
+    if (activeTab === 'feedback' && typeof renderFeedback === 'function') {
+        renderFeedback();
+    }
+
+    // Re-render Comparison if modal is open
+    const compareModal = document.getElementById('compareModal');
+    if (compareModal && !compareModal.classList.contains('hidden') && typeof renderComparison === 'function') {
+        renderComparison();
+    }
+
+    // Re-render CrossTab if tab is active
+    if (activeTab === 'crosstab' && typeof renderCrossTab === 'function') {
+        renderCrossTab();
+    }
 }
 
 // Check preference on load
 if (localStorage.getItem('theme') === 'dark') {
     document.documentElement.classList.add('dark');
-    if (typeof Chart !== 'undefined') {
-        Chart.defaults.color = '#94a3b8';
-        Chart.defaults.borderColor = '#334155';
-    }
+}
+if (typeof applyChartThemeDefaults === 'function') {
+    applyChartThemeDefaults();
 }
 
 // --- FEATURE: PDF Export (Modern & Robust) ---
@@ -2065,13 +2237,266 @@ function startTour() {
 }
 
 // --- FEATURE: Cross Tabulation ---
+// --- FEATURE: Cross Tabulation (Enhanced Colors & Visibility for Day & Night) ---
+function getCrossTabCellStyle(score, themeName = 'blue', isDark = false) {
+    if (typeof score !== 'number' || isNaN(score) || score <= 0) {
+        return {
+            bg: isDark ? 'rgba(30, 41, 59, 0.4)' : '#f8fafc',
+            border: isDark ? 'rgba(51, 65, 85, 0.4)' : '#e2e8f0',
+            text: isDark ? '#64748b' : '#94a3b8',
+            nColor: isDark ? '#475569' : '#cbd5e1'
+        };
+    }
+
+    if (themeName === 'traffic') {
+        if (score >= 4.2) {
+            return {
+                bg: isDark ? 'rgba(5, 150, 105, 0.9)' : '#059669',
+                border: isDark ? '#34d399' : '#047857',
+                text: '#ffffff',
+                nColor: isDark ? '#d1fae5' : '#ecfdf5'
+            };
+        }
+        if (score >= 3.6) {
+            return {
+                bg: isDark ? 'rgba(6, 78, 59, 0.55)' : '#d1fae5',
+                border: isDark ? 'rgba(52, 211, 153, 0.45)' : '#6ee7b7',
+                text: isDark ? '#6ee7b7' : '#065f46',
+                nColor: isDark ? '#a7f3d0' : '#047857'
+            };
+        }
+        if (score >= 3.0) {
+            return {
+                bg: isDark ? 'rgba(120, 53, 15, 0.55)' : '#fef3c7',
+                border: isDark ? 'rgba(251, 191, 36, 0.45)' : '#fcd34d',
+                text: isDark ? '#fde68a' : '#92400e',
+                nColor: isDark ? '#fcd34d' : '#b45309'
+            };
+        }
+        if (score >= 2.5) {
+            return {
+                bg: isDark ? 'rgba(124, 45, 18, 0.6)' : '#ffedd5',
+                border: isDark ? 'rgba(251, 146, 60, 0.45)' : '#fdba74',
+                text: isDark ? '#fed7aa' : '#9a3412',
+                nColor: isDark ? '#fdba74' : '#c2410c'
+            };
+        }
+        return {
+            bg: isDark ? 'rgba(127, 29, 29, 0.65)' : '#fee2e2',
+            border: isDark ? 'rgba(248, 113, 113, 0.45)' : '#fca5a5',
+            text: isDark ? '#fca5a5' : '#991b1b',
+            nColor: isDark ? '#fecaca' : '#b91c1c'
+        };
+    }
+
+    if (themeName === 'emerald') {
+        if (score >= 4.5) {
+            return {
+                bg: isDark ? '#059669' : '#047857',
+                border: isDark ? '#34d399' : '#065f46',
+                text: '#ffffff',
+                nColor: '#d1fae5'
+            };
+        }
+        if (score >= 4.0) {
+            return {
+                bg: isDark ? 'rgba(16, 185, 129, 0.85)' : '#10b981',
+                border: isDark ? '#6ee7b7' : '#059669',
+                text: '#ffffff',
+                nColor: '#ecfdf5'
+            };
+        }
+        if (score >= 3.5) {
+            return {
+                bg: isDark ? 'rgba(6, 95, 70, 0.55)' : '#a7f3d0',
+                border: isDark ? 'rgba(52, 211, 153, 0.4)' : '#6ee7b7',
+                text: isDark ? '#a7f3d0' : '#064e3b',
+                nColor: isDark ? '#6ee7b7' : '#047857'
+            };
+        }
+        if (score >= 3.0) {
+            return {
+                bg: isDark ? 'rgba(6, 78, 59, 0.4)' : '#d1fae5',
+                border: isDark ? 'rgba(52, 211, 153, 0.3)' : '#a7f3d0',
+                text: isDark ? '#6ee7b7' : '#065f46',
+                nColor: isDark ? '#34d399' : '#059669'
+            };
+        }
+        if (score >= 2.5) {
+            return {
+                bg: isDark ? 'rgba(30, 41, 59, 0.65)' : '#f0fdf4',
+                border: isDark ? 'rgba(51, 65, 85, 0.4)' : '#dcfce7',
+                text: isDark ? '#cbd5e1' : '#1e293b',
+                nColor: isDark ? '#94a3b8' : '#64748b'
+            };
+        }
+        return {
+            bg: isDark ? 'rgba(15, 23, 42, 0.8)' : '#f8fafc',
+            border: isDark ? 'rgba(51, 65, 85, 0.3)' : '#e2e8f0',
+            text: isDark ? '#94a3b8' : '#475569',
+            nColor: isDark ? '#64748b' : '#94a3b8'
+        };
+    }
+
+    if (themeName === 'violet') {
+        if (score >= 4.5) {
+            return {
+                bg: isDark ? '#7c3aed' : '#6d28d9',
+                border: isDark ? '#a78bfa' : '#5b21b6',
+                text: '#ffffff',
+                nColor: '#ede9fe'
+            };
+        }
+        if (score >= 4.0) {
+            return {
+                bg: isDark ? 'rgba(139, 92, 246, 0.85)' : '#8b5cf6',
+                border: isDark ? '#c4b5fd' : '#7c3aed',
+                text: '#ffffff',
+                nColor: '#f5f3ff'
+            };
+        }
+        if (score >= 3.5) {
+            return {
+                bg: isDark ? 'rgba(109, 40, 217, 0.55)' : '#c4b5fd',
+                border: isDark ? 'rgba(167, 139, 250, 0.4)' : '#a78bfa',
+                text: isDark ? '#ddd6fe' : '#4c1d95',
+                nColor: isDark ? '#c4b5fd' : '#5b21b6'
+            };
+        }
+        if (score >= 3.0) {
+            return {
+                bg: isDark ? 'rgba(91, 33, 182, 0.4)' : '#ede9fe',
+                border: isDark ? 'rgba(167, 139, 250, 0.3)' : '#ddd6fe',
+                text: isDark ? '#c4b5fd' : '#5b21b6',
+                nColor: isDark ? '#a78bfa' : '#7c3aed'
+            };
+        }
+        if (score >= 2.5) {
+            return {
+                bg: isDark ? 'rgba(30, 41, 59, 0.65)' : '#f5f3ff',
+                border: isDark ? 'rgba(51, 65, 85, 0.4)' : '#ede9fe',
+                text: isDark ? '#cbd5e1' : '#1e293b',
+                nColor: isDark ? '#94a3b8' : '#64748b'
+            };
+        }
+        return {
+            bg: isDark ? 'rgba(15, 23, 42, 0.8)' : '#f8fafc',
+            border: isDark ? 'rgba(51, 65, 85, 0.3)' : '#e2e8f0',
+            text: isDark ? '#94a3b8' : '#475569',
+            nColor: isDark ? '#64748b' : '#94a3b8'
+        };
+    }
+
+    // Default: 'blue' (High-contrast, elegant Sapphire/Sky Blue)
+    if (score >= 4.5) {
+        return {
+            bg: isDark ? '#2563eb' : '#1d4ed8',
+            border: isDark ? '#60a5fa' : '#1e40af',
+            text: '#ffffff',
+            nColor: isDark ? '#dbeafe' : '#eff6ff'
+        };
+    }
+    if (score >= 4.0) {
+        return {
+            bg: isDark ? '#1d4ed8' : '#3b82f6',
+            border: isDark ? 'rgba(96, 165, 250, 0.5)' : '#2563eb',
+            text: '#ffffff',
+            nColor: isDark ? '#bfdbfe' : '#eff6ff'
+        };
+    }
+    if (score >= 3.5) {
+        return {
+            bg: isDark ? 'rgba(37, 99, 235, 0.45)' : '#93c5fd',
+            border: isDark ? 'rgba(96, 165, 250, 0.45)' : '#60a5fa',
+            text: isDark ? '#bfdbfe' : '#1e3a8a',
+            nColor: isDark ? '#93c5fd' : '#1e40af'
+        };
+    }
+    if (score >= 3.0) {
+        return {
+            bg: isDark ? 'rgba(30, 58, 138, 0.4)' : '#dbeafe',
+            border: isDark ? 'rgba(59, 130, 246, 0.35)' : '#bfdbfe',
+            text: isDark ? '#93c5fd' : '#1e40af',
+            nColor: isDark ? '#60a5fa' : '#2563eb'
+        };
+    }
+    if (score >= 2.5) {
+        return {
+            bg: isDark ? 'rgba(30, 41, 59, 0.7)' : '#eff6ff',
+            border: isDark ? 'rgba(51, 65, 85, 0.4)' : '#dbeafe',
+            text: isDark ? '#cbd5e1' : '#1e293b',
+            nColor: isDark ? '#94a3b8' : '#64748b'
+        };
+    }
+    return {
+        bg: isDark ? 'rgba(15, 23, 42, 0.8)' : '#f8fafc',
+        border: isDark ? 'rgba(51, 65, 85, 0.3)' : '#e2e8f0',
+        text: isDark ? '#94a3b8' : '#475569',
+        nColor: isDark ? '#64748b' : '#94a3b8'
+    };
+}
+
+function getCrossTabLegendHtml(themeName, isDark) {
+    const isTraffic = themeName === 'traffic';
+    const bands = isTraffic ? [
+        { label: '< 2.5 (Kritik)', score: 2.0 },
+        { label: '2.5 - 2.9 (Düşük)', score: 2.7 },
+        { label: '3.0 - 3.5 (Orta)', score: 3.2 },
+        { label: '3.6 - 4.1 (İyi)', score: 3.8 },
+        { label: '≥ 4.2 (Çok İyi)', score: 4.6 }
+    ] : [
+        { label: '< 2.5', score: 2.0 },
+        { label: '2.5 - 2.9', score: 2.7 },
+        { label: '3.0 - 3.4', score: 3.2 },
+        { label: '3.5 - 3.9', score: 3.7 },
+        { label: '4.0 - 4.4', score: 4.2 },
+        { label: '≥ 4.5', score: 4.7 }
+    ];
+
+    const items = bands.map(b => {
+        const style = getCrossTabCellStyle(b.score, themeName, isDark);
+        return `
+            <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold shadow-xs border transition-all" 
+                 style="background-color: ${style.bg}; border-color: ${style.border}; color: ${style.text}">
+                <span>${b.label}</span>
+            </div>
+        `;
+    }).join('');
+
+    return `
+        <div class="flex items-center justify-between gap-4 mb-4 p-3 bg-white dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700 text-xs flex-wrap shadow-xs">
+            <div class="flex items-center gap-2 flex-wrap">
+                <span class="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                    <i class="fa-solid fa-layer-group text-blue-500"></i> Renk Skalası:
+                </span>
+                <div class="flex items-center gap-1.5 flex-wrap">${items}</div>
+            </div>
+            <div class="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                * Hücrelerdeki <strong class="text-slate-700 dark:text-slate-200">n</strong> değeri kesişimdeki katılımcı sayısını gösterir.
+            </div>
+        </div>
+    `;
+}
+
 function renderCrossTab() {
     const group1Key = document.getElementById('crossGroup1')?.value;
     const group2Key = document.getElementById('crossGroup2')?.value;
     const questionKey = document.getElementById('crossQuestion')?.value;
+    const themeSelect = document.getElementById('crossColorTheme');
     const container = document.getElementById('crosstab-container');
 
     if (!container) return;
+
+    // Restore or sync saved color theme
+    let colorTheme = themeSelect ? themeSelect.value : (localStorage.getItem('crossColorTheme') || 'blue');
+    if (themeSelect && themeSelect.value !== colorTheme) {
+        themeSelect.value = colorTheme;
+    }
+    try {
+        localStorage.setItem('crossColorTheme', colorTheme);
+    } catch(e) {}
+
+    const isDark = typeof isDarkTheme === 'function' ? isDarkTheme() : document.documentElement.classList.contains('dark');
 
     if (!group1Key || group1Key === 'none' || !group2Key || group2Key === 'none' || !questionKey) {
         container.innerHTML = '<div class="flex items-center justify-center h-full text-slate-400 text-sm py-12">Lütfen yukarıdan analiz edilecek X Ekseni, Y Ekseni ve Soruyu seçin.</div>';
@@ -2093,22 +2518,31 @@ function renderCrossTab() {
     const g1Values = [...new Set(rawData.map(row => row[group1Key]).filter(val => val !== undefined && val !== null && val !== ''))].sort();
     const g2Values = [...new Set(rawData.map(row => row[group2Key]).filter(val => val !== undefined && val !== null && val !== ''))].sort();
 
-    // Create Matrix
-    let html = '<table class="w-full text-sm text-center border-collapse bg-white dark:bg-slate-800 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700">';
+    // Start with Legend Bar
+    let html = getCrossTabLegendHtml(colorTheme, isDark);
+
+    // Matrix Wrapper with Clean Scroll
+    html += '<div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-xs">';
+    html += '<table class="w-full text-sm text-center border-collapse table-auto">';
     
     // Header Row (Group 1 values)
-    html += '<thead class="bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-300">';
-    html += '<tr><th class="border border-slate-200 dark:border-slate-700 p-3 bg-slate-100 dark:bg-slate-950 font-bold">Y Ekseni \\ X Ekseni</th>';
+    html += '<thead class="bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-200 sticky top-0 z-20 shadow-xs">';
+    html += '<tr>';
+    html += '<th class="border-b border-r border-slate-200 dark:border-slate-700 p-3 bg-slate-100 dark:bg-slate-950 font-bold text-xs uppercase tracking-wider text-slate-600 dark:text-slate-300 sticky left-0 z-30 min-w-[140px]">Y Ekseni \\ X Ekseni</th>';
     g1Values.forEach(g1 => {
-        html += `<th class="border border-slate-200 dark:border-slate-700 p-3 font-semibold">${g1}</th>`;
+        html += `<th class="border-b border-r border-slate-200 dark:border-slate-700 p-3 font-semibold text-xs tracking-tight min-w-[86px]">${g1}</th>`;
     });
-    html += '<th class="border border-slate-200 dark:border-slate-700 p-3 font-bold bg-slate-100 dark:bg-slate-950">Genel (Satır)</th></tr></thead><tbody>';
+    html += '<th class="border-b border-slate-200 dark:border-slate-700 p-3 font-bold text-xs uppercase tracking-wider bg-slate-100 dark:bg-slate-950 min-w-[100px]">Genel (Satır)</th>';
+    html += '</tr></thead><tbody>';
 
     let allScores = [];
+    let matrixGrandSum = 0;
+    let matrixGrandCount = 0;
 
     // Rows (Group 2 values)
     g2Values.forEach(g2 => {
-        html += `<tr><td class="border border-slate-200 dark:border-slate-700 p-3 font-semibold bg-slate-50 dark:bg-slate-900 text-left text-slate-700 dark:text-slate-300">${g2}</td>`;
+        html += `<tr class="hover:bg-slate-50/50 dark:hover:bg-slate-750/30 transition-colors">`;
+        html += `<td class="border-b border-r border-slate-200 dark:border-slate-700 p-3 font-bold bg-slate-50 dark:bg-slate-900 text-left text-slate-800 dark:text-slate-200 sticky left-0 z-10 text-xs">${g2}</td>`;
         
         let rowSum = 0;
         let rowCount = 0;
@@ -2117,8 +2551,7 @@ function renderCrossTab() {
             // Find intersection
             const subset = rawData.filter(row => row[group1Key] == g1 && row[group2Key] == g2);
             let cellScore = null;
-            let cellHtml = '<span class="text-slate-300">-</span>';
-            let cellBg = '';
+            let cellContent = `<div class="py-2.5 px-2 flex flex-col items-center justify-center text-slate-300 dark:text-slate-600 font-light select-none text-sm">—</div>`;
 
             if (subset.length > 0) {
                 let sum = 0;
@@ -2138,39 +2571,40 @@ function renderCrossTab() {
 
                 if (count > 0) {
                     cellScore = sum / count;
-                    rowSum += cellScore * subset.length; // Weighted average for row total
+                    rowSum += cellScore * subset.length;
                     rowCount += subset.length;
                     allScores.push(cellScore);
-                    
-                    // Simple heatmap coloring
-                    const intensity = (cellScore - 1) / 4; // 0 to 1
-                    cellBg = `background-color: rgba(59, 130, 246, ${intensity * 0.8})`; // Blue scale
-                    
-                    let textColor = cellScore > 3.5 ? 'text-white font-bold' : 'text-slate-700 font-medium';
-                    
-                    cellHtml = `
-                        <div class="flex flex-col items-center justify-center">
-                            <span class="${textColor} text-base">${cellScore.toFixed(2)}</span>
-                            <span class="text-[9px] ${cellScore > 3.5 ? 'text-blue-100' : 'text-slate-400'} mt-0.5">n=${subset.length}</span>
+                    matrixGrandSum += sum;
+                    matrixGrandCount += count;
+
+                    const style = getCrossTabCellStyle(cellScore, colorTheme, isDark);
+
+                    cellContent = `
+                        <div class="rounded-lg py-2 px-2 flex flex-col items-center justify-center transition-all border shadow-2xs hover:scale-[1.03] cursor-default"
+                             style="background-color: ${style.bg}; border-color: ${style.border}; color: ${style.text}">
+                            <span class="text-sm font-extrabold tracking-tight">${cellScore.toFixed(2)}</span>
+                            <span class="text-[10px] font-semibold mt-0.5" style="color: ${style.nColor}">n=${subset.length}</span>
                         </div>
                     `;
                 }
             }
             
-            html += `<td class="border border-slate-200 dark:border-slate-700 p-2 min-w-[80px]" style="${cellBg}">${cellHtml}</td>`;
+            html += `<td class="border-b border-r border-slate-200 dark:border-slate-700 p-1.5 min-w-[84px] align-middle">${cellContent}</td>`;
         });
 
-        // Row Average
-        let rowAvgHtml = '<span class="text-slate-300">-</span>';
+        // Row Average (Genel Satır)
+        let rowAvgHtml = '<span class="text-slate-300 dark:text-slate-600">—</span>';
         if (rowCount > 0) {
             const rowAvg = rowSum / rowCount;
-            rowAvgHtml = `<span class="font-bold text-slate-700 dark:text-slate-200">${rowAvg.toFixed(2)}</span>`;
+            rowAvgHtml = `<span class="font-extrabold text-slate-800 dark:text-slate-100 text-sm">${rowAvg.toFixed(2)}</span>`;
         }
-        html += `<td class="border border-slate-200 dark:border-slate-700 p-3 bg-slate-50 dark:bg-slate-900">${rowAvgHtml}</td></tr>`;
+        html += `<td class="border-b border-slate-200 dark:border-slate-700 p-2.5 bg-slate-50/70 dark:bg-slate-900/80 align-middle">${rowAvgHtml}</td></tr>`;
     });
 
     // Column Averages (Bottom Row)
-    html += '<tr class="bg-slate-100 dark:bg-slate-950 text-slate-700 dark:text-slate-300 font-bold"><td class="border border-slate-200 dark:border-slate-700 p-3 text-left">Genel (Sütun)</td>';
+    html += '<tr class="bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-200 font-bold border-t-2 border-slate-300 dark:border-slate-700">';
+    html += '<td class="border-r border-slate-200 dark:border-slate-700 p-3 text-left sticky left-0 bg-slate-100 dark:bg-slate-950 z-10 text-xs uppercase tracking-wider">Genel (Sütun)</td>';
+    
     g1Values.forEach(g1 => {
         const subset = rawData.filter(row => row[group1Key] == g1);
         let colSum = 0;
@@ -2188,15 +2622,25 @@ function renderCrossTab() {
             }
         });
 
-        let colAvgHtml = '<span class="text-slate-400">-</span>';
+        let colAvgHtml = '<span class="text-slate-300 dark:text-slate-600 font-light">—</span>';
         if (colCount > 0) {
-            colAvgHtml = (colSum / colCount).toFixed(2);
+            colAvgHtml = `<span class="font-bold text-slate-800 dark:text-slate-100 text-sm">${(colSum / colCount).toFixed(2)}</span>`;
         }
-        html += `<td class="border border-slate-200 dark:border-slate-700 p-3">${colAvgHtml}</td>`;
+        html += `<td class="border-r border-slate-200 dark:border-slate-700 p-2.5 align-middle">${colAvgHtml}</td>`;
     });
     
-    html += '<td class="border border-slate-200 dark:border-slate-700 p-3 text-slate-400 text-xs">Genel Ort.</td></tr>';
+    // Bottom-right Grand Total Average
+    const grandAvgVal = matrixGrandCount > 0 ? (matrixGrandSum / matrixGrandCount).toFixed(2) : '-';
+    html += `
+        <td class="p-2.5 bg-blue-50/70 dark:bg-blue-950/40 text-center align-middle border-slate-200 dark:border-slate-700">
+            <div class="flex flex-col items-center justify-center">
+                <span class="font-extrabold text-blue-700 dark:text-blue-300 text-base">${grandAvgVal}</span>
+                <span class="text-[9px] font-bold text-blue-600/70 dark:text-blue-400/70 uppercase tracking-tighter">Genel Ort.</span>
+            </div>
+        </td>
+    `;
+    html += '</tr>';
 
-    html += '</tbody></table>';
+    html += '</tbody></table></div>';
     container.innerHTML = html;
 }

@@ -92,7 +92,7 @@ function updateChartWithAnnotation(chartId, text, color) {
                 size: 14,
                 weight: 'bold'
             },
-            color: color || '#1e293b',
+            color: color || ((typeof isDarkTheme === 'function' && isDarkTheme()) ? '#f1f5f9' : '#1e293b'),
             padding: { top: 10, bottom: 20 }
         };
         console.log('Subtitle added:', text);

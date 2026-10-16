@@ -13,6 +13,20 @@ const PALETTE = [
     { bg: 'rgba(100, 116, 139, 0.7)', border: 'rgb(100, 116, 139)' } // Slate
 ];
 
+// Dark-mode variant of PALETTE (same hue order, brighter tones for slate backgrounds)
+const PALETTE_DARK = [
+    { bg: 'rgba(96, 165, 250, 0.8)', border: 'rgb(96, 165, 250)' },   // Blue 400
+    { bg: 'rgba(52, 211, 153, 0.8)', border: 'rgb(52, 211, 153)' },   // Green 400
+    { bg: 'rgba(251, 191, 36, 0.8)', border: 'rgb(251, 191, 36)' },   // Amber 400
+    { bg: 'rgba(244, 114, 182, 0.8)', border: 'rgb(244, 114, 182)' }, // Pink 400
+    { bg: 'rgba(129, 140, 248, 0.8)', border: 'rgb(129, 140, 248)' }, // Indigo 400
+    { bg: 'rgba(248, 113, 113, 0.8)', border: 'rgb(248, 113, 113)' }, // Red 400
+    { bg: 'rgba(167, 139, 250, 0.8)', border: 'rgb(167, 139, 250)' }, // Violet 400
+    { bg: 'rgba(45, 212, 191, 0.8)', border: 'rgb(45, 212, 191)' },   // Teal 400
+    { bg: 'rgba(251, 146, 60, 0.8)', border: 'rgb(251, 146, 60)' },   // Orange 400
+    { bg: 'rgba(148, 163, 184, 0.8)', border: 'rgb(148, 163, 184)' }  // Slate 400
+];
+
 function wrapText(str, maxLen) {
     if (!str) return str;
     if (str.length <= maxLen) return str;

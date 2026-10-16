@@ -65,33 +65,33 @@ const STOP_WORDS = new Set([
     "ve", "ile", "veya", "ya", "da", "de", "ki", "ama", "fakat", "lakin", "ancak", "oysa", "oysaki", "madem", "meğer", "sanki",
     "çünkü", "için", "gibi", "kadar", "göre", "tarafından", "dolayı", "yüzünden", "rağmen", "karşın", "ise", "diye",
     "üzere", "sayesinde", "nedeniyle", "amacıyla", "hakkında", "konusunda", "ilgili", "dair", "açısından", "yerine", "birlikte", "beraber",
-    
+
     // Zamirler
     "ben", "sen", "o", "biz", "siz", "onlar", "bana", "sana", "ona", "bize", "size", "onlara",
     "beni", "seni", "onu", "bizi", "sizi", "onları", "benim", "senin", "onun", "bizim", "sizin", "onların",
     "kendi", "kendisi", "kendim", "kendin", "kendileri", "birbiri", "birbirleri", "birbirimize", "birbirinize",
     "şu", "bu", "bunlar", "şunlar", "bundan", "şundan", "ondan", "bunun", "şunun", "bunu", "şunu",
     "kim", "kimse", "hiçkimse", "herkes", "biri", "birisi", "diğeri", "öteki", "beriki", "bazı", "bazısı", "tümü", "hepsi",
-    
+
     // Miktar, Sıklık ve Zaman
     "bir", "iki", "hiç", "hiçbiri", "her", "bazen", "birkaç", "biraz", "çok", "daha", "en", "pek", "gayet", "oldukça",
     "fazla", "az", "eksik", "tam", "yarım", "bütün", "tüm", "sadece", "yalnız", "tek",
     "her", "zaman", "şimdi", "sonra", "önce", "dün", "bugün", "yarın", "henüz", "hala", "artık", "yine", "yeniden", "tekrar", "hep", "daima", "asla",
     "defa", "kere", "tane", "kez",
-    
+
     // Durum ve Doğrulama
     "gerçekten", "kesinlikle", "mutlaka", "belki", "muhtemelen", "galiba", "umarım", "inşallah", "maalesef", "neyse",
     "özellikle", "genellikle", "çoğunlukla", "adeta", "zaten", "aslında", "esasen", "esas",
     "ayrıca", "üstelik", "hatta", "örneğin", "mesela", "yani", "demek", "öyleyse", "tabii", "elbette", "şüphesiz",
     "evet", "hayır", "peki", "tamam",
-    
+
     // Soru Kelimeleri
     "nasıl", "neden", "niçin", "niye", "ne", "kim", "hangi", "nereye", "nerede", "nereden", "mı", "mi", "mu", "mü",
-    
+
     // Sıfatlar ve Zarf (Konu Olmaması Gerekenler)
     "iyi", "kötü", "güzel", "çirkin", "büyük", "küçük", "eski", "yeni", "doğru", "yanlış",
     "öyle", "böyle", "şöyle", "şekilde", "olarak", "olan", "olanlar", "olmayan",
-    
+
     // Fiiller ve Yardımcı Fiiller
     "var", "yok", "vardı", "yoktu", "varmış", "yokmuş", "değil", "değildi",
     "ol", "oldu", "olacak", "olur", "olmaz", "olmalı", "olabilir", "olsun", "olduk", "oldukça", "olarak", "olması", "olmasını", "olduğunu",
@@ -99,7 +99,7 @@ const STOP_WORDS = new Set([
     "et", "etti", "etmiş", "edecek", "eder", "etmez", "etmeli", "edebilir", "ediyor", "edilmesi", "edilmeli",
     "gel", "git", "al", "ver", "gör", "bil", "bul", "çık", "gir",
     "bence", "sence", "katılıyorum", "düşünüyorum", "biliyorum", "istiyorum", "istiyoruz", "gerekiyor", "gerek", "lazım", "şart", "rica", "ediyorum",
-    
+
     // Anket ve Geribildirim Klişeleri
     "teşekkür", "teşekkürler", "tebrik", "tebrikler", "memnun", "memnunum", "memnunuz", "memnuniyet", "şikayet", "şikayetçiyim",
     "herhangi", "baska", "başka", "dışında", "haricinde", "lütfen", "saygılar", "merhaba", "selam"
@@ -118,12 +118,12 @@ function extractDynamicTopics(textsArray, topN = 7) {
 
     textsArray.forEach(text => {
         if (!text) return;
-        
+
         let clean = text.toLocaleLowerCase('tr-TR')
             .replace(/([^\w\sğüşıöç])/gi, ' ')
             .replace(/\s+/g, " ")
             .trim();
-        
+
         if (clean.length < 3) return;
         totalDocs++;
 
@@ -135,10 +135,10 @@ function extractDynamicTopics(textsArray, topN = 7) {
         for (let t of tokens) {
             if (t.length < 3) continue;
             if (STOP_WORDS.has(t)) continue;
-            
+
             let stemmed = stem(t);
             if (STOP_WORDS.has(stemmed) || stemmed.length < 3) continue;
-            
+
             // Eş Anlamlı Kelime Haritalama
             let mapped = typeof SYNONYMS !== 'undefined' ? (SYNONYMS[stemmed] || SYNONYMS[t] || stemmed) : stemmed;
             validTokens.push(mapped);
@@ -152,8 +152,8 @@ function extractDynamicTopics(textsArray, topN = 7) {
 
         // Bigram Frekansı (İkili Öbekler)
         for (let i = 0; i < validTokens.length - 1; i++) {
-            let bigram = validTokens[i] + " " + validTokens[i+1];
-            termGlobalFreq[bigram] = (termGlobalFreq[bigram] || 0) + 1.5; 
+            let bigram = validTokens[i] + " " + validTokens[i + 1];
+            termGlobalFreq[bigram] = (termGlobalFreq[bigram] || 0) + 1.5;
             uniqueTokensInDoc.add(bigram);
         }
 
@@ -175,7 +175,7 @@ function extractDynamicTopics(textsArray, topN = 7) {
 
     // Skorlara göre sırala
     let sortedKeys = Object.keys(tfidfScores).sort((a, b) => tfidfScores[b] - tfidfScores[a]);
-    
+
     // Anlamlı skorlara sahip konuları filtrele
     let finalTopics = [];
     for (let key of sortedKeys) {
@@ -203,7 +203,7 @@ const SYNONYMS = {
     "zam": "Ücret/Maaş",
     "prim": "Ücret/Maaş",
     "ikramiye": "Ücret/Maaş",
-    
+
     "müdür": "Yönetim",
     "yönetici": "Yönetim",
     "şef": "Yönetim",
@@ -211,14 +211,14 @@ const SYNONYMS = {
     "yönetim": "Yönetim",
     "lider": "Yönetim",
     "patron": "Yönetim",
-    
+
     "ofis": "Fiziksel Ortam",
     "tuvalet": "Fiziksel Ortam",
     "yemekhane": "Fiziksel Ortam",
     "klima": "Fiziksel Ortam",
     "ortam": "Fiziksel Ortam",
     "temizlik": "Fiziksel Ortam",
-    
+
     "eğitim": "Eğitim/Gelişim",
     "kurs": "Eğitim/Gelişim",
     "gelişim": "Eğitim/Gelişim",
@@ -233,7 +233,7 @@ const SYNONYMS = {
  */
 function stem(word) {
     if (!word || word.length <= 4) return word; // 4 harf veya altını elleme
-    
+
     const suffixes = [
         "larımızdan", "lerimizden", "larındaki", "lerindeki", "larımızın", "lerimizin",
         "larından", "lerinden", "larımıza", "lerimize", "larımız", "lerimiz",
@@ -380,7 +380,7 @@ function analyzeSentiment(text, dynamicTopics = []) {
             if (clean.includes(p)) {
                 clauseScore += SENTIMENT.phrases[p];
                 clauseMatched.push(`[Kalıp: ${p}]`);
-                clean = clean.replace(p, ""); 
+                clean = clean.replace(p, "");
             }
         }
 
@@ -447,7 +447,7 @@ function analyzeSentiment(text, dynamicTopics = []) {
 
         totalScore += clauseScore;
         totalMatched.push(...clauseMatched);
-        
+
         // Bu clause (parça) içindeki konulara, parçanın duygu skorunu ekle
         clauseTopics.forEach(t => {
             allFoundTopics.add(t);

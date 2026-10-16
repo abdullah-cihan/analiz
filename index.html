@@ -1244,6 +1244,15 @@
                                 <label class="text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 block">Analiz Edilecek Veri</label>
                                 <select id="crossQuestion" onchange="renderCrossTab()" class="w-full bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-white text-sm rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500"></select>
                             </div>
+                            <div class="w-full sm:w-48">
+                                <label class="text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 block">Renk Teması</label>
+                                <select id="crossColorTheme" onchange="renderCrossTab()" class="w-full bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-white text-sm rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="blue">🌊 Mavi Tonları</option>
+                                    <option value="traffic">🚦 Memnuniyet (Trafik)</option>
+                                    <option value="emerald">🌿 Zümrüt Yeşili</option>
+                                    <option value="violet">🔮 Mor & İndigo</option>
+                                </select>
+                            </div>
                         </div>
                         <div id="crosstab-container" class="overflow-x-auto min-h-[300px]">
                             <div class="flex items-center justify-center h-full text-slate-400 text-sm py-12">

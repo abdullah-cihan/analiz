@@ -874,6 +874,11 @@ function updateDashboard() {
         generateDetailedReport();
     }
 
+    // Render CrossTab if tab active
+    if (activeTab === 'crosstab' && typeof renderCrossTab === 'function') {
+        renderCrossTab();
+    }
+
     // Enable Comparison Button
     const compBtn = document.getElementById('btn-open-comp');
     if (groupSelect.value !== 'none') compBtn.classList.remove('hidden');
