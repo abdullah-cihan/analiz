@@ -5,13 +5,13 @@ function generateCustomReport() {
     if (modal) modal.classList.add('hidden');
 
     if (!window.questionList || window.questionList.length === 0) {
-        alert('Lütfen önce bir Excel dosyası yükleyin.');
+        showToast('Lütfen önce bir Excel dosyası yükleyin.', 'warning');
         return;
     }
 
     const data = getFilteredData();
     if (!data || data.length === 0) {
-        alert('Veri bulunamadı.');
+        showToast('Veri bulunamadı. Lütfen önce veri yükleyin.', 'warning');
         return;
     }
 
@@ -349,8 +349,11 @@ function generateCustomReport() {
         w.document.write(printHTML);
         w.document.close();
         w.onload = () => setTimeout(() => w.focus(), 500);
-    } else {
-        alert('Popup engelleyici aktif. Lütfen izin verin.');
+        if (typeof showToast === 'function') {
+            showToast('Popup engelleyici aktif. Lütfen tarayıcınızdan açılır pencerelere izin verin.', 'warning');
+        } else {
+            alert('Popup engelleyici aktif. Lütfen izin verin.');
+        }
     }
 }
 

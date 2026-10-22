@@ -8,6 +8,7 @@ window.feedbackColumns = [];
 window.multiSelectCandidates = [];
 window.dateColumns = [];
 window.currentFilters = []; // Global filter state for sharing
+window.lastCustomMapping = null; // Son uygulanan sütun eşlemesi (saveAndRefresh için)
 
 // DOM Elements (Explicit Definition)
 const loader = document.getElementById('loader');
@@ -34,8 +35,10 @@ function loadSampleData() {
                 mainContainer.classList.remove('blur-sm');
             }, 500);
 
-            // Show a toast or notification that sample data is loaded
-            alert("Örnek veri seti başarıyla yüklendi! Sistemin tüm özelliklerini keşfedebilirsiniz.");
+            // Show toast notification instead of alert
+            if (typeof showToast === 'function') {
+                showToast('Örnek veri seti başarıyla yüklendi! Tüm özellikleri keşfedebilirsiniz.', 'success');
+            }
 
         } catch (err) {
             loader.style.display = 'none';
@@ -256,10 +259,6 @@ function autoDetectColumns(headers, json) {
                 if (key.includes('Biriminiz')) label = 'Birim / Fakülte';
                 else if (key.includes('seçeneği işaretleyiniz')) label = 'Rol / Unvan';
                 else if (key.includes('Cinsiyet')) label = 'Cinsiyet';
-
-                // We won't push directly to global groupingCandidates here, 
-                // just marking it as a "group" type for the mapping UI
-                detected.potentialGroupKeys.push(key); // Already in there
             }
         }
 
@@ -417,7 +416,7 @@ function selectBulkRange() {
 
 function reopenColumnMappingModal() {
     if (!originalJson || originalJson.length === 0) {
-        alert("Önce bir veri dosyası yüklemelisiniz.");
+        showToast("Önce bir veri dosyası yüklemelisiniz.", "warning");
         return;
     }
     document.getElementById('columnMappingModal').classList.remove('hidden');
@@ -449,7 +448,7 @@ function applyColumnMapping() {
     });
 
     if (userMapping.questions.length === 0) {
-        alert("En az bir tane 'Puanlanan Soru' seçmelisiniz.");
+        showToast("En az bir tane 'Puanlanan Soru' seçmelisiniz.", "warning");
         return;
     }
 
@@ -460,6 +459,7 @@ function applyColumnMapping() {
     // Allow UI to repaint
     setTimeout(() => {
         analyzeAndProcess(originalJson, userMapping);
+        window.lastCustomMapping = userMapping; // Eşlemeyi sakla
 
         loader.style.display = 'none';
         uploadOverlay.style.opacity = '0';
@@ -698,7 +698,7 @@ function resetFilters() {
 
 function addNewFilter() {
     if (groupingCandidates.length === 0) {
-        alert("Filtrelenecek uygun sütun bulunamadı.");
+        showToast('Filtrelenecek uygun sütun bulunamadı. Lütfen önce veri yükleyin.', 'warning');
         return;
     }
 
@@ -879,6 +879,11 @@ function updateDashboard() {
         renderCrossTab();
     }
 
+    // Render Advanced Statistics if tab active
+    if (activeTab === 'advstats' && typeof renderAdvancedStats === 'function') {
+        renderAdvancedStats();
+    }
+
     // Enable Comparison Button
     const compBtn = document.getElementById('btn-open-comp');
     if (groupSelect.value !== 'none') compBtn.classList.remove('hidden');
@@ -886,7 +891,8 @@ function updateDashboard() {
 }
 
 function saveAndRefresh() {
-    analyzeAndProcess(originalJson);
+    // lastCustomMapping varsa kullan, yoksa otomatik algılamaya düş
+    analyzeAndProcess(originalJson, window.lastCustomMapping || null);
     const statusEl = document.getElementById('save-status');
     if (statusEl) {
         statusEl.classList.remove('hidden', 'opacity-0');
@@ -897,7 +903,7 @@ function saveAndRefresh() {
             setTimeout(() => statusEl.classList.add('hidden'), 300);
         }, 2000);
     } else {
-        alert("Veriler kaydedildi ve analizler güncellendi!");
+        showToast("Veriler kaydedildi ve analizler güncellendi!", "success");
     }
 }
 
@@ -919,7 +925,7 @@ function exportTableToExcel() {
 
 function generateShareLink(durationHours = 1, customTitle = "", readOnly = true, permissions = {}, note = "") {
     if (!originalJson || originalJson.length === 0) {
-        alert("Paylaşılacak veri bulunamadı.");
+        showToast("Paylaşılacak veri bulunamadı.", "warning");
         return null;
     }
 
@@ -944,7 +950,8 @@ function generateShareLink(durationHours = 1, customTitle = "", readOnly = true,
             savedGroup: currentGroup,
             savedFilters: currentFilters,
             permissions: permissions,
-            note: note
+            note: note,
+            customMapping: window.lastCustomMapping || null
         }
     };
 
@@ -957,7 +964,7 @@ function generateShareLink(durationHours = 1, customTitle = "", readOnly = true,
         return `${baseUrl}#share=${compressed}`;
     } catch (e) {
         console.error("Compression error:", e);
-        alert("Veri sıkıştırılırken hata oluştu: " + e.message);
+        showToast("Veri sıkıştırılırken hata oluştu: " + e.message, "error");
         return null;
     }
 }
@@ -1001,8 +1008,6 @@ function openShareModal() {
     // Reset fields
     const noteEl = document.getElementById('shareManagerNote');
     if(noteEl) noteEl.value = '';
-    const pinEl = document.getElementById('sharePin');
-    if(pinEl) pinEl.value = '';
     const qrContainer = document.getElementById('qrCodeContainer');
     if(qrContainer) qrContainer.classList.add('hidden');
     
@@ -1065,7 +1070,11 @@ function checkSharedUrl() {
                 const loadData = () => {
                     // Load Data
                     originalJson = parsed.data; // Keep originalJson updated for other functions
-                    analyzeAndProcess(parsed.data);
+                    const customMapping = options.customMapping || null;
+                    if (customMapping) {
+                        window.lastCustomMapping = customMapping;
+                    }
+                    analyzeAndProcess(parsed.data, customMapping);
 
                     // Restore Filter States if Available
                     if (savedGroup !== 'none') {
@@ -1181,7 +1190,6 @@ function checkSharedUrl() {
         } catch (e) {
             loader.style.display = 'none';
             statusMsg.textContent = "Hata: " + e.message;
-            alert(e.message);
             // Kapanma işlemi
             document.body.innerHTML = `
                 <div class="min-h-screen bg-slate-100 flex items-center justify-center p-4">
@@ -1272,8 +1280,10 @@ function startShareCountdown(expiresAt) {
 
         if (diff <= 0) {
             clearInterval(window.shareCountdownInterval);
-            alert("Paylaşım süresi doldu. Ana sayfaya yönlendiriliyorsunuz.");
-            window.location.href = window.location.pathname;
+            showToast("Paylaşım süresi doldu. Ana sayfaya yönlendiriliyorsunuz.", "warning", 3000);
+            setTimeout(() => {
+                window.location.href = window.location.pathname;
+            }, 1500);
             return;
         }
 

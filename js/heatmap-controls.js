@@ -77,7 +77,7 @@ function exportHeatmapToExcel() {
     const table = document.querySelector('#heatmap-container table');
 
     if (!table) {
-        alert('Isı haritası bulunamadı. Lütfen önce bir karşılaştırma grubu seçin.');
+        showToast('Isı haritası bulunamadı. Lütfen önce bir karşılaştırma grubu seçin.', 'warning');
         return;
     }
 
@@ -95,7 +95,7 @@ function exportHeatmapToExcel() {
         console.log('Excel exported successfully:', filename);
     } catch (error) {
         console.error('Excel export error:', error);
-        alert('Excel export sırasında hata oluştu:\n' + error.message);
+        showToast('Excel export sırasında hata oluştu: ' + error.message, 'error');
     }
 }
 
@@ -106,7 +106,7 @@ async function exportHeatmapAsPNG() {
     const container = document.getElementById('heatmap-container');
 
     if (!container || !container.querySelector('table')) {
-        alert('Isı haritası bulunamadı. Lütfen önce bir karşılaştırma grubu seçin.');
+        showToast('Isı haritası bulunamadı. Lütfen önce bir karşılaştırma grubu seçin.', 'warning');
         return;
     }
 
@@ -156,7 +156,7 @@ async function exportHeatmapAsPNG() {
 
     } catch (error) {
         console.error('PNG export error:', error);
-        alert('PNG export sırasında hata oluştu:\n' + error.message);
+        showToast('PNG export sırasında hata oluştu: ' + error.message, 'error');
     } finally {
         document.body.removeChild(loadingDiv);
     }
@@ -169,7 +169,7 @@ async function copyHeatmapTable() {
     const table = document.querySelector('#heatmap-container table');
 
     if (!table) {
-        alert('Isı haritası bulunamadı. Lütfen önce bir karşılaştırma grubu seçin.');
+        showToast('Isı haritası bulunamadı. Lütfen önce bir karşılaştırma grubu seçin.', 'warning');
         return;
     }
 
@@ -195,7 +195,7 @@ async function copyHeatmapTable() {
         console.log('Table copied successfully');
     } catch (error) {
         console.error('Copy error:', error);
-        alert('Kopyalama sırasında hata oluştu:\n' + error.message);
+        showToast('Kopyalama sırasında hata oluştu: ' + error.message, 'error');
     }
 }
 

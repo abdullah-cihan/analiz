@@ -1,119 +1,59 @@
 // Chart Annotation and Customization Features
+// Strategy: NEVER mutate live Chart.js objects (proxy recursion risk).
+// Store state globally → trigger chart re-creation → subtitle injected at build time.
 
-let chartAnnotations = {}; // Store annotations per chart
-let chartColors = {
-    main: null,
-    dist: null
-};
+window.chartAnnotations = window.chartAnnotations || {}; // { distChart: 'text', mainChart: 'text' }
+window.chartAnnotationColors = window.chartAnnotationColors || {}; // { distChart: '#hex', mainChart: '#hex' }
 
 // Open annotation modal for a chart
 function openAnnotationModal(chartId) {
     const modal = document.getElementById('annotationModal');
+    if (!modal) return;
+
     const chartName = document.getElementById('annotationChartName');
     const textInput = document.getElementById('annotationText');
     const colorInput = document.getElementById('annotationColor');
 
-    // Set chart name
-    chartName.textContent = chartId === 'mainChart' ? 'Ana Grafik' : 'Dağılım Grafiği';
+    if (chartName) chartName.textContent = chartId === 'mainChart' ? 'Ana Grafik' : 'Dağılım Grafiği';
+    if (textInput) textInput.value = window.chartAnnotations[chartId] || '';
+    if (colorInput) colorInput.value = window.chartAnnotationColors[chartId] || '#3b82f6';
 
-    // Load existing annotation if any
-    textInput.value = chartAnnotations[chartId] || '';
-    colorInput.value = chartColors[chartId] || '#3b82f6';
-
-    // Store current chart ID
     modal.dataset.chartId = chartId;
-
-    // Show modal
     modal.classList.remove('hidden');
 }
 
-// Save annotation and color
+// Save annotation — store state, trigger safe re-render
 function saveAnnotation() {
     const modal = document.getElementById('annotationModal');
+    if (!modal) return;
+
     const chartId = modal.dataset.chartId;
-    const text = document.getElementById('annotationText').value;
-    const color = document.getElementById('annotationColor').value;
+    const text = (document.getElementById('annotationText')?.value || '').trim();
+    const color = document.getElementById('annotationColor')?.value || '#3b82f6';
 
-    console.log('Saving annotation for', chartId, ':', text, color);
+    // Persist to global state (read by renderDistributionChart / renderMainChart)
+    window.chartAnnotations[chartId] = text;
+    window.chartAnnotationColors[chartId] = color;
 
-    // Save annotation
-    chartAnnotations[chartId] = text;
-    chartColors[chartId] = color;
-
-    // Update chart
-    updateChartWithAnnotation(chartId, text, color);
-
-    // Close modal
     modal.classList.add('hidden');
-}
 
-// Update chart with annotation
-function updateChartWithAnnotation(chartId, text, color) {
-    console.log('Updating chart:', chartId, 'text:', text, 'color:', color);
-
-    // Get chart from global charts object
-    const chartKey = chartId === 'mainChart' ? 'main' : 'dist';
-    const chart = window.charts ? window.charts[chartKey] : null;
-
-    if (!chart) {
-        console.error('Chart not found:', chartId, 'Available charts:', window.charts);
-        alert('Grafik bulunamadı. Lütfen sayfayı yenileyin.');
-        return;
-    }
-
-    console.log('Chart found:', chart);
-
-    // Update chart color if specified
-    if (color) {
-        const datasets = chart.data.datasets;
-        datasets.forEach(dataset => {
-            if (dataset.backgroundColor) {
-                if (Array.isArray(dataset.backgroundColor)) {
-                    dataset.backgroundColor = dataset.backgroundColor.map(() => color);
-                    if (dataset.borderColor && Array.isArray(dataset.borderColor)) {
-                        dataset.borderColor = dataset.borderColor.map(() => color);
-                    }
-                } else {
-                    dataset.backgroundColor = color;
-                    dataset.borderColor = color;
-                }
-            }
-        });
-        console.log('Color updated to:', color);
-    }
-
-    // Add/Update annotation text as subtitle
-    if (text) {
-        chart.options.plugins = chart.options.plugins || {};
-        chart.options.plugins.subtitle = {
-            display: true,
-            text: text,
-            font: {
-                size: 14,
-                weight: 'bold'
-            },
-            color: color || ((typeof isDarkTheme === 'function' && isDarkTheme()) ? '#f1f5f9' : '#1e293b'),
-            padding: { top: 10, bottom: 20 }
-        };
-        console.log('Subtitle added:', text);
-    } else {
-        if (chart.options.plugins && chart.options.plugins.subtitle) {
-            chart.options.plugins.subtitle.display = false;
+    // Trigger a full safe re-render (chart is destroyed and recreated from scratch)
+    if (typeof updateDashboard === 'function') {
+        updateDashboard();
+        if (text) {
+            showToast('Grafik güncellendi.', 'success');
         }
     }
-
-    chart.update();
-    console.log('Chart updated successfully');
 }
 
 // Close annotation modal
 function closeAnnotationModal() {
-    document.getElementById('annotationModal').classList.add('hidden');
+    const modal = document.getElementById('annotationModal');
+    if (modal) modal.classList.add('hidden');
 }
 
 // Add annotation button click handlers on charts
 function initChartAnnotationButtons() {
-    // Add annotation button to each chart container
     const mainChartContainer = document.getElementById('mainChartContainer');
     const distChartParent = document.querySelector('#distChart')?.parentElement?.parentElement;
 
@@ -130,7 +70,7 @@ function initChartAnnotationButtons() {
     }
 }
 
-// Create annotation button (ICON ONLY)
+// Create annotation button (pen icon)
 function createAnnotationButton(chartId) {
     const btn = document.createElement('button');
     btn.className = 'chart-annotate-btn no-print';
@@ -157,7 +97,6 @@ function createAnnotationButton(chartId) {
         align-items: center;
         justify-content: center;
     `;
-
     btn.onmouseenter = () => {
         btn.style.background = 'rgba(37, 99, 235, 1)';
         btn.style.transform = 'scale(1.1)';
@@ -166,18 +105,14 @@ function createAnnotationButton(chartId) {
         btn.style.background = 'rgba(59, 130, 246, 0.9)';
         btn.style.transform = 'scale(1)';
     };
-
     return btn;
 }
 
 // Initialize when charts are created
 if (typeof window.addEventListener !== 'undefined') {
     window.addEventListener('load', () => {
-        // Wait for charts to be created
         setTimeout(initChartAnnotationButtons, 1500);
     });
-
-    // Also try to add buttons when data is loaded
     window.addEventListener('dataLoaded', () => {
         setTimeout(initChartAnnotationButtons, 500);
     });

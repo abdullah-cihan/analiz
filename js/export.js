@@ -3,7 +3,7 @@
 
 function exportPPTX() {
     if (!window.rawData || window.rawData.length === 0) {
-        alert("Lütfen önce veri yükleyin veya örnek veriyi başlatın.");
+        showToast('Lütfen önce veri yükleyin veya örnek veriyi başlatın.', 'warning');
         return;
     }
 
@@ -107,11 +107,11 @@ function exportPPTX() {
             console.log("PPTX başarıyla kaydedildi.");
         }).catch(err => {
             console.error("PPTX kaydetme hatası:", err);
-            alert("Dosya kaydedilirken bir hata oluştu.");
+            showToast('Dosya kaydedilirken bir hata oluştu.', 'error');
         });
         
     } catch (e) {
         console.error("PPTX oluşturulurken hata:", e);
-        alert("PowerPoint sunumu oluşturulurken bir hata oluştu.");
+        showToast('PowerPoint sunumu oluşturulurken bir hata oluştu.', 'error');
     }
 }

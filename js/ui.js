@@ -2,7 +2,8 @@
 
 window.showChartLabels = true;
 let currentChartType = 'bar';
-let charts = {};
+window.charts = {}; // Global: chart-annotation.js ve diğer modüller buraya erişir
+let charts = window.charts; // Yerel referans — ikisi aynı nesneyi gösterir
 let activeTab = 'general';
 let tableSort = { key: 'id', order: 'asc' };
 let editorPage = 1;
@@ -12,6 +13,73 @@ const editorPageSize = 50;
 if (typeof Chart !== 'undefined' && typeof ChartDataLabels !== 'undefined') {
     Chart.register(ChartDataLabels);
 }
+
+// --- TOAST NOTIFICATION SYSTEM ---
+function showToast(message, type = 'info', duration = 3500) {
+    let container = document.getElementById('toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toast-container';
+        container.style.cssText = `
+            position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+            display: flex; flex-direction: column; gap: 10px; pointer-events: none;
+        `;
+        document.body.appendChild(container);
+    }
+
+    const icons = {
+        success: 'fa-circle-check',
+        error:   'fa-circle-xmark',
+        warning: 'fa-triangle-exclamation',
+        info:    'fa-circle-info'
+    };
+    const colors = {
+        success: { bg: '#f0fdf4', border: '#86efac', icon: '#16a34a', text: '#15803d' },
+        error:   { bg: '#fef2f2', border: '#fca5a5', icon: '#dc2626', text: '#b91c1c' },
+        warning: { bg: '#fffbeb', border: '#fde68a', icon: '#d97706', text: '#b45309' },
+        info:    { bg: '#eff6ff', border: '#93c5fd', icon: '#2563eb', text: '#1d4ed8' }
+    };
+    const c = colors[type] || colors.info;
+    const icon = icons[type] || icons.info;
+
+    const toast = document.createElement('div');
+    toast.style.cssText = `
+        display: flex; align-items: center; gap: 10px;
+        background: ${c.bg}; border: 1px solid ${c.border}; border-radius: 10px;
+        padding: 12px 16px; min-width: 260px; max-width: 380px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+        pointer-events: all; cursor: default;
+        animation: toastSlideIn 0.3s ease; opacity: 1;
+        transition: opacity 0.3s ease, transform 0.3s ease;
+    `;
+    toast.innerHTML = `
+        <i class="fa-solid ${icon}" style="color:${c.icon}; font-size:16px; flex-shrink:0;"></i>
+        <span style="font-size:13px; font-weight:500; color:${c.text}; line-height:1.4;">${message}</span>
+    `;
+
+    // Inject animation if not already present
+    if (!document.getElementById('toast-style')) {
+        const style = document.createElement('style');
+        style.id = 'toast-style';
+        style.textContent = `
+            @keyframes toastSlideIn {
+                from { opacity: 0; transform: translateY(16px); }
+                to   { opacity: 1; transform: translateY(0); }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    container.appendChild(toast);
+
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(8px)';
+        setTimeout(() => toast.remove(), 320);
+    }, duration);
+}
+
+
 
 // --- REPORT CUSTOMIZATION SETTINGS ---
 
@@ -25,7 +93,7 @@ function initReportSettings() {
     // Load Title
     const savedTitle = localStorage.getItem('custom_report_title');
     if (savedTitle) {
-        document.getElementById('page-title').textContent = savedTitle;
+        applyPageTitle(savedTitle);
         const input = document.getElementById('reportTitleInput');
         if (input) input.value = savedTitle;
     }
@@ -47,7 +115,11 @@ function handleReportTitleChange(val) {
         localStorage.setItem('custom_report_title', val);
     }
     
-    const titles = document.querySelectorAll('#page-title');
+    applyPageTitle(val);
+}
+
+function applyPageTitle(val) {
+    const titles = document.querySelectorAll('[data-page-title]');
     titles.forEach(t => {
         if (t.tagName === 'H1') {
             t.innerHTML = `<i class="fa-solid fa-chart-pie text-indigo-500"></i> ${val}`;
@@ -63,7 +135,7 @@ function handleLogoUpload(input) {
 
         // Size Check (500KB)
         if (file.size > 500 * 1024) {
-            alert("Logo dosyası çok büyük! Lütfen 500KB'dan küçük bir dosya seçin.");
+            showToast("Logo dosyası çok büyük! Lütfen 500KB'dan küçük bir dosya seçin.", 'error');
             input.value = ''; // Reset
             return;
         }
@@ -73,13 +145,14 @@ function handleLogoUpload(input) {
             const base64 = e.target.result;
             // Validate Image
             if (!base64.startsWith('data:image')) {
-                alert("Lütfen geçerli bir resim dosyası seçin.");
+                showToast('Lütfen geçerli bir resim dosyası seçin.', 'error');
                 return;
             }
 
             localStorage.setItem('custom_report_logo', base64);
             applyLogo(base64);
-            document.getElementById('logo-upload-text').textContent = "Logo Yüklü (Değiştir)";
+            const logoText = document.getElementById('logo-upload-text');
+            if (logoText) logoText.textContent = "Logo Yüklü (Değiştir)";
         };
         reader.readAsDataURL(file);
     }
@@ -285,6 +358,7 @@ function switchTab(tabId) {
     if (tabId === 'editor') renderEditor();
     if (tabId === 'report') generateDetailedReport();
     if (tabId === 'crosstab' && typeof renderCrossTab === 'function') renderCrossTab();
+    if (tabId === 'advstats' && typeof renderAdvancedStats === 'function') renderAdvancedStats();
 }
 
 function setChartType(type) {
@@ -647,6 +721,17 @@ function renderMainChart(stats, rawData = [], groupKey = 'none') {
         }
     }
 
+    // --- Inject annotation subtitle safely at creation time (chart-annotation.js stores state here) ---
+    const mainAnnotationText = (window.chartAnnotations && window.chartAnnotations['mainChart']) || '';
+    const mainAnnotationColor = (window.chartAnnotationColors && window.chartAnnotationColors['mainChart']) || null;
+    chartConfig.options.plugins.subtitle = mainAnnotationText ? {
+        display: true,
+        text: mainAnnotationText,
+        font: { size: 12, weight: 'normal', style: 'italic' },
+        color: mainAnnotationColor || theme.textMuted,
+        padding: { top: 4, bottom: 10 }
+    } : { display: false };
+
     charts.main = new Chart(ctx, chartConfig);
 }
 
@@ -678,6 +763,17 @@ function renderDistributionChart(data, groupKey) {
     const distPalette = (isDark && typeof PALETTE_DARK !== 'undefined') ? PALETTE_DARK : PALETTE;
     const bgColors = labels.map((_, i) => distPalette[i % distPalette.length].border);
 
+    // --- Annotation state (set by chart-annotation.js, applied here safely at creation time) ---
+    const distAnnotationText = (window.chartAnnotations && window.chartAnnotations['distChart']) || '';
+    const distAnnotationColor = (window.chartAnnotationColors && window.chartAnnotationColors['distChart']) || null;
+    const subtitleConfig = distAnnotationText ? {
+        display: true,
+        text: distAnnotationText,
+        font: { size: 12, weight: 'normal', style: 'italic' },
+        color: distAnnotationColor || theme.textMuted,
+        padding: { top: 4, bottom: 12 }
+    } : { display: false };
+
     charts.dist = new Chart(ctx, {
         type: 'doughnut',
         data: {
@@ -698,6 +794,7 @@ function renderDistributionChart(data, groupKey) {
             animation: { animateScale: true, animateRotate: true },
             layout: { padding: 20 },
             plugins: {
+                subtitle: subtitleConfig,
                 legend: {
                     position: 'right', // Move to right as in example/preferred for long info
                     align: 'start',
@@ -765,7 +862,7 @@ function renderDistributionChart(data, groupKey) {
                 if (els.length && groupKey !== 'none') {
                     const idx = els[0].index;
                     const label = labels[idx];
-                    alert(`"${label}" filtresini eklemek için sol menüyü kullanabilirsiniz.`);
+                    showToast(`"${label}" grubunu filtrelemek için sol menüden filtre ekleyebilirsiniz.`, 'info');
                 }
             }
         }
@@ -1703,7 +1800,7 @@ function openComparisonModal() {
     const groupSelect = document.getElementById('groupSelect');
     const groupKey = groupSelect.value;
     if (groupKey === 'none') {
-        alert("Önce bir karşılaştırma kriteri seçmelisiniz (Sol Menü).");
+        showToast('Önce bir karşılaştırma kriteri seçmelisiniz (Sol Menü).', 'warning');
         return;
     }
     const data = getFilteredData();
@@ -1741,12 +1838,85 @@ function renderComparison() {
 
     const avgsA = [], avgsB = [], deltas = [];
 
+    // Overall participant averages for hypothesis testing
+    const overallA = dataA.map(r => {
+        let sum = 0, count = 0;
+        questionList.forEach((_, i) => {
+            const v = r[`Q${i + 1}`];
+            if (typeof v === 'number' && !isNaN(v)) { sum += v; count++; }
+        });
+        return count > 0 ? sum / count : null;
+    }).filter(v => v !== null);
+
+    const overallB = dataB.map(r => {
+        let sum = 0, count = 0;
+        questionList.forEach((_, i) => {
+            const v = r[`Q${i + 1}`];
+            if (typeof v === 'number' && !isNaN(v)) { sum += v; count++; }
+        });
+        return count > 0 ? sum / count : null;
+    }).filter(v => v !== null);
+
+    // Statistical Hypothesis Tests on Overall Satisfaction
+    const statsSummaryEl = document.getElementById('compStatsSummary');
+    if (statsSummaryEl) {
+        if (typeof calculateTTest === 'function' && overallA.length >= 2 && overallB.length >= 2) {
+            const tRes = calculateTTest(overallA, overallB);
+            const mwRes = typeof calculateMannWhitneyU === 'function' ? calculateMannWhitneyU(overallA, overallB) : null;
+
+            const badgeBg = tRes.isSignificant 
+                ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300' 
+                : 'bg-slate-50 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300';
+            const badgeIcon = tRes.isSignificant ? 'fa-check-circle text-emerald-600' : 'fa-circle-info text-slate-400';
+
+            statsSummaryEl.className = `p-4 rounded-xl border ${badgeBg} flex flex-col md:flex-row items-start md:items-center justify-between gap-4 text-xs transition`;
+            statsSummaryEl.innerHTML = `
+                <div class="space-y-1">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid ${badgeIcon} text-base"></i>
+                        <span class="font-bold text-sm">${tRes.significanceLabel}</span>
+                    </div>
+                    <p class="text-xs opacity-80">
+                        <strong>${groupA}</strong> (Ort: ${tRes.mean1}, n: ${overallA.length}) ile 
+                        <strong>${groupB}</strong> (Ort: ${tRes.mean2}, n: ${overallB.length}) arasında fark: 
+                        <span class="font-semibold">${Math.abs(tRes.diff).toFixed(2)} puan</span>
+                    </p>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <span class="px-2.5 py-1 bg-white/80 dark:bg-slate-700/80 rounded border border-slate-200 dark:border-slate-600 font-mono" title="Welch İki Örneklem T-Testi">
+                        <strong>t:</strong> ${tRes.t} (df: ${tRes.df})
+                    </span>
+                    <span class="px-2.5 py-1 bg-white/80 dark:bg-slate-700/80 rounded border border-slate-200 dark:border-slate-600 font-mono font-bold" title="Anlamlılık Değeri (p < 0.05 anlamlı kabul edilir)">
+                        ${tRes.pValueFormatted}
+                    </span>
+                    <span class="px-2.5 py-1 bg-white/80 dark:bg-slate-700/80 rounded border border-slate-200 dark:border-slate-600" title="Cohen's d Etki Büyüklüğü">
+                        <strong>d:</strong> ${tRes.cohensD} <span class="opacity-75">(${tRes.effectSizeCategory})</span>
+                    </span>
+                    ${mwRes && mwRes.valid ? `
+                    <span class="px-2.5 py-1 bg-white/80 dark:bg-slate-700/80 rounded border border-slate-200 dark:border-slate-600 font-mono" title="Mann-Whitney U Testi (Parametrik Olmayan Sıralama)">
+                        <strong>U:</strong> ${mwRes.u} (z: ${mwRes.z})
+                    </span>` : ''}
+                </div>
+            `;
+        } else {
+            statsSummaryEl.className = 'hidden';
+            statsSummaryEl.innerHTML = '';
+        }
+    }
+
     questionList.forEach((q, i) => {
         const k = `Q${i + 1}`;
-        const sumA = dataA.reduce((a, r) => a + r[k], 0);
-        const avgA = dataA.length ? sumA / dataA.length : 0;
-        const sumB = dataB.reduce((a, r) => a + r[k], 0);
-        const avgB = dataB.length ? sumB / dataB.length : 0;
+        const valsA = dataA.map(r => r[k]).filter(v => typeof v === 'number' && !isNaN(v));
+        const valsB = dataB.map(r => r[k]).filter(v => typeof v === 'number' && !isNaN(v));
+
+        const sumA = valsA.reduce((a, b) => a + b, 0);
+        const avgA = valsA.length ? sumA / valsA.length : 0;
+        const sumB = valsB.reduce((a, b) => a + b, 0);
+        const avgB = valsB.length ? sumB / valsB.length : 0;
+
+        const qTTest = (typeof calculateTTest === 'function' && valsA.length >= 2 && valsB.length >= 2) 
+            ? calculateTTest(valsA, valsB) 
+            : null;
 
         avgsA.push(avgA.toFixed(2));
         avgsB.push(avgB.toFixed(2));
@@ -1756,7 +1926,8 @@ function renderComparison() {
             valA: avgA,
             valB: avgB,
             diff: Math.abs(avgA - avgB),
-            winner: avgA > avgB ? groupA : (avgB > avgA ? groupB : "Eşit")
+            winner: avgA > avgB ? groupA : (avgB > avgA ? groupB : "Eşit"),
+            qTTest: qTTest
         });
     });
 
@@ -1830,22 +2001,32 @@ function renderComparison() {
 
     deltas.slice(0, 10).forEach(d => {
         const row = document.createElement('tr');
-        row.className = "border-b border-slate-50 hover:bg-slate-50 transition";
-        const colorClass = d.winner === groupA ? "text-indigo-600" : (d.winner === groupB ? "text-orange-600" : "text-slate-400");
+        row.className = "border-b border-slate-50 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition";
+        const colorClass = d.winner === groupA ? "text-indigo-600 dark:text-indigo-400" : (d.winner === groupB ? "text-orange-600 dark:text-orange-400" : "text-slate-400");
         const barWidth = (d.diff / 2) * 100;
+
+        let sigBadge = '';
+        if (d.qTTest && d.qTTest.valid) {
+            if (d.qTTest.isSignificant) {
+                sigBadge = `<span class="ml-1 text-[9px] font-bold px-1 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300" title="Welch t-test: ${d.qTTest.pValueFormatted}, t=${d.qTTest.t}">p<0.05*</span>`;
+            } else {
+                sigBadge = `<span class="ml-1 text-[9px] px-1 py-0.5 rounded bg-slate-100 text-slate-400 dark:bg-slate-700/60 dark:text-slate-400" title="Welch t-test: ${d.qTTest.pValueFormatted}">p≥0.05</span>`;
+            }
+        }
 
         row.innerHTML = `
             <td class="p-3" title="${d.text}">
                 <div class="flex items-center">
-                    <span class="font-bold text-xs bg-slate-100 px-1.5 rounded mr-2 text-slate-500">${d.q}</span> 
-                    <span class="opacity-90 text-xs font-medium text-slate-700 clamp-1">${d.text.substring(0, 25)}...</span>
+                    <span class="font-bold text-xs bg-slate-100 dark:bg-slate-700 px-1.5 rounded mr-2 text-slate-500 dark:text-slate-300">${d.q}</span> 
+                    <span class="opacity-90 text-xs font-medium text-slate-700 dark:text-slate-300 clamp-1">${d.text.substring(0, 25)}...</span>
+                    ${sigBadge}
                 </div>
             </td>
             <td class="p-3">
                 <div class="flex items-center gap-2">
                      <span class="font-bold text-slate-800 dark:text-white w-8 text-right">${d.diff.toFixed(2)}</span>
-                     <div class="h-1.5 flex-1 bg-slate-100 rounded-full overflow-hidden">
-                        <div class="h-full bg-slate-400" style="width: ${Math.min(100, barWidth)}%"></div>
+                     <div class="h-1.5 flex-1 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                        <div class="h-full bg-slate-400 dark:bg-slate-500" style="width: ${Math.min(100, barWidth)}%"></div>
                      </div>
                 </div>
             </td>
@@ -1902,13 +2083,13 @@ async function exportPDF() {
 
     // Validation
     if (!questionList || questionList.length === 0) {
-        alert('Lütfen önce bir Excel dosyası yükleyin.');
+        showToast('Lütfen önce bir Excel dosyası yükleyin.', 'warning');
         return;
     }
 
     const data = getFilteredData();
     if (!data || data.length === 0) {
-        alert('Veri bulunamadı. Lütfen dosya yükleyin.');
+        showToast('Veri bulunamadı. Lütfen dosya yükleyin.', 'warning');
         return;
     }
 
@@ -2202,7 +2383,11 @@ async function exportPDF() {
         const loading = document.getElementById('pdf-loading');
         if (loading) document.body.removeChild(loading);
 
-        alert('PDF oluşturulurken bir hata oluştu. Lütfen sayfayı yenileyin ve tekrar deneyin.\n\nHata: ' + error.message);
+        if (typeof showToast === 'function') {
+            showToast('PDF oluşturulurken hata oluştu: ' + error.message, 'error', 5000);
+        } else {
+            alert('PDF oluşturulurken bir hata oluştu: ' + error.message);
+        }
     }
 }
 
